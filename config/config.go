@@ -43,47 +43,51 @@ type Config struct {
 func LoadConfig() *Config {
 	godotenv.Load()
 
-	cfg:=&Config{}
+	cfg := &Config{}
 
-	cfg.Server.Port=getEnv("SERVER_PORT","8080")
+	cfg.Server.Port = getEnv("SERVER_PORT", "8080")
 
-	cfg.DB.Host=getEnv("DB_HOST","localhost")
-	cfg.DB.Port=getEnvAsInt("DB_PORT",2007)
-	cfg.DB.User=getEnv("DB_USER","postgres")
-	cfg.DB.Password=getEnv("DB_PASSWORD","")
-	cfg.DB.Name=getEnv("DB_NAME","Sootika")
-	cfg.DB.SSLMode=getEnv("DB_SSLMODE","disable")
-	cfg.DB.TimeZone=getEnv("DB_TIMEZONE","Asia/Kolkata")
+	//database
+	cfg.DB.Host = getEnv("DB_HOST", "localhost")
+	cfg.DB.Port = getEnvAsInt("DB_PORT", 2007)
+	cfg.DB.User = getEnv("DB_USER", "postgres")
+	cfg.DB.Password = getEnv("DB_PASSWORD", "")
+	cfg.DB.Name = getEnv("DB_NAME", "Sootika")
+	cfg.DB.SSLMode = getEnv("DB_SSLMODE", "disable")
+	cfg.DB.TimeZone = getEnv("DB_TIMEZONE", "Asia/Kolkata")
 
-	cfg.JWT.AccessSecret=getEnv("ACCESS_SECRET","")
-	cfg.JWT.RefreshSecret=getEnv("REFRESH_SECRET","")
-	cfg.JWT.AccessTTLMinutes=getEnvAsInt("ACCESS_TTL_MINUTE",15)
-	cfg.JWT.RefreshTTLHours=getEnvAsInt("REFRESH_TTL_HOUR",168)
-	cfg.JWT.MaxSessionHours=getEnvAsInt("MAX_SESSION",720)
+	//jwt
+	cfg.JWT.AccessSecret = getEnv("ACCESS_SECRET", "")
+	cfg.JWT.RefreshSecret = getEnv("REFRESH_SECRET", "")
+	cfg.JWT.AccessTTLMinutes = getEnvAsInt("ACCESS_TTL_MINUTE", 15)
+	cfg.JWT.RefreshTTLHours = getEnvAsInt("REFRESH_TTL_HOUR", 168)
+	cfg.JWT.MaxSessionHours = getEnvAsInt("MAX_SESSION", 720)
 
-	cfg.SMTP.Host=getEnv("SMTP_HOST","smtp.gmail.com")
-	cfg.SMTP.Port=getEnvAsInt("SMTP_PORT",587)
-	cfg.SMTP.Username=getEnv("SMTP_USERNAME","")
-	cfg.SMTP.Password=getEnv("SMTP_PASSWORD","")
-	cfg.SMTP.From=getEnv("SMTP_FROM","Sootika <sootika@gmail.com>")
+	//email
+	cfg.SMTP.Host = getEnv("SMTP_HOST", "smtp.gmail.com")
+	cfg.SMTP.Port = getEnvAsInt("SMTP_PORT", 587)
+	cfg.SMTP.Username = getEnv("SMTP_USERNAME", "")
+	cfg.SMTP.Password = getEnv("SMTP_PASSWORD", "")
+	cfg.SMTP.From = getEnv("SMTP_FROM", "Sootika <sootika@gmail.com>")
 
-	cfg.OTP.Length=getEnvAsInt("OTP_LENGTH",5)
-	cfg.OTP.ExpiryMinutes=getEnvAsInt("OTP_EXPIRY_MINUTES",5)
+	//otp
+	cfg.OTP.Length = getEnvAsInt("OTP_LENGTH", 5)
+	cfg.OTP.ExpiryMinutes = getEnvAsInt("OTP_EXPIRY_MINUTES", 5)
 
 	return cfg
 }
 
-func getEnv(key,defaultValue string)string{
-	if value:=os.Getenv(key);value!=""{
-		return  value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
 	return defaultValue
 }
 
-func getEnvAsInt(key string,defaultValue int)int{
-	if value:=os.Getenv(key);value!=""{
-		if intValue,err:=strconv.Atoi(value);err==nil{
-			return  intValue
+func getEnvAsInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
 		}
 	}
 	return defaultValue
