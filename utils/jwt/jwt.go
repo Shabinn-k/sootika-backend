@@ -8,7 +8,7 @@ import (
 )
 
 type Manager struct {
-	accessSercret string
+	accessSecret string
 	refreshSecret string
 	accessTTL     time.Duration
 	refreshTTL    time.Duration
@@ -17,7 +17,7 @@ type Manager struct {
 
 func NewJWTManager(cfg *config.Config) *Manager {
 	return &Manager{
-		accessSercret: cfg.JWT.AccessSecret,
+		accessSecret: cfg.JWT.AccessSecret,
 		refreshSecret: cfg.JWT.RefreshSecret,
 		accessTTL:     time.Duration(cfg.JWT.AccessTTLMinutes) * time.Minute,
 		refreshTTL:    time.Duration(cfg.JWT.RefreshTTLHours) * time.Hour,
@@ -32,7 +32,7 @@ func (j *Manager) GenerateAccessToken(userId, role string) (string, error) {
 		"exp":     time.Now().Add(j.accessTTL).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(j.accessSercret))
+	return token.SignedString([]byte(j.accessSecret))
 }
 
 func (j *Manager) GenerateRefreshToken(userId, role, sessionId string) (string, error) {
@@ -48,7 +48,7 @@ func (j *Manager) GenerateRefreshToken(userId, role, sessionId string) (string, 
 
 func (j *Manager) ValidateAccessToken(tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
-		return []byte(j.accessSercret), nil
+		return []byte(j.accessSecret), nil
 	})
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid access token")
