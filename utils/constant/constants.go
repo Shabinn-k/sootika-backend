@@ -1,7 +1,7 @@
-package constants
+package constant
 
-var (
-	SUCCESS             = 100
+const (
+	SUCCESS             = 200
 	CREATED             = 201
 	BADREQUEST          = 400
 	UNAUTHORIZED        = 401
