@@ -1,10 +1,10 @@
 package config
 
 import (
+	"github.com/joho/godotenv"
+	"log"
 	"os"
 	"strconv"
-
-	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -41,15 +41,19 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	godotenv.Load()
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Println("No .env file found")
+	}
+	log.Println("ENV DB_HOST:", os.Getenv("DB_HOST"))
 
 	cfg := &Config{}
 
 	cfg.Server.Port = getEnv("SERVER_PORT", "8080")
 
 	//database
-	cfg.DB.Host = getEnv("DB_HOST", "localhost")
-	cfg.DB.Port = getEnvAsInt("DB_PORT", 2007)
+	cfg.DB.Host = getEnv("DB_HOST", "127.0.0.1")
+	cfg.DB.Port = getEnvAsInt("DB_PORT", 5432)
 	cfg.DB.User = getEnv("DB_USER", "postgres")
 	cfg.DB.Password = getEnv("DB_PASSWORD", "")
 	cfg.DB.Name = getEnv("DB_NAME", "Sootika")
@@ -68,7 +72,7 @@ func LoadConfig() *Config {
 	cfg.SMTP.Port = getEnvAsInt("SMTP_PORT", 587)
 	cfg.SMTP.Username = getEnv("SMTP_USERNAME", "")
 	cfg.SMTP.Password = getEnv("SMTP_PASSWORD", "")
-	cfg.SMTP.From = getEnv("SMTP_FROM", "Sootika <sootika@gmail.com>")
+	cfg.SMTP.From = getEnv("SMTP_FROM", "Sootika <shhabin.07@gmail.com>")
 
 	//otp
 	cfg.OTP.Length = getEnvAsInt("OTP_LENGTH", 5)

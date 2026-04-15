@@ -40,41 +40,53 @@ func NewAuthService(
 	}
 }
 
-func (s *AuthService) Signup(name, emailStr, passwordStr string) error {
+func (s *AuthService) Signup(name, emailStr, phone, passwordStr string) error {
+
 	var existing models.User
 	err := s.repo.FindOneWhere(&existing, "email = ?", emailStr)
 	if err == nil {
 		return errors.New("email already exist")
 	}
-	hashed, err := password.HashPassword(passwordStr)
-	if err != nil {
-		return err
-	}
-	user := models.User{
-		Name:       name,
-		Email:      emailStr,
-		Password:   hashed,
-		IsVerified: false,
-	}
-	if err := s.repo.Insert(&user); err != nil {
-		return err
-	}
+
 	otpcode, err := otp.GenerateOTP()
 	if err != nil {
 		return err
 	}
-	hashedOTP, err := password.HashPassword(otpcode)
-	key := "otp :verify:" + emailStr
 
+	hashedOTP, err := password.HashPassword(otpcode)
+	if err != nil {
+		return err
+	}
+
+	if err := s.emailService.SendOTP(emailStr, otpcode); err != nil {
+		return err
+	}
+
+	hashed, err := password.HashPassword(passwordStr)
+	if err != nil {
+		return err
+	}
+
+	user := models.User{
+		Name:       name,
+		Email:      emailStr,
+		Phone:      phone,
+		Password:   hashed,
+		IsVerified: false,
+	}
+
+	if err := s.repo.Insert(&user); err != nil {
+		return err
+	}
+
+	key := "otp:verify:" + emailStr
 	s.redis.Client.Set(
 		cache.Ctx,
 		key,
 		hashedOTP,
 		time.Duration(s.cfg.OTP.ExpiryMinutes)*time.Minute,
 	)
-	if err := s.emailService.SendOTP(emailStr, otpcode); err != nil {
-		return err
-	}
+
 	logger.Log.Infof("OTP sent to %s", emailStr)
 	return nil
 }
@@ -93,11 +105,11 @@ func (s *AuthService) VerifyOTP(emailStr, otpCode string) error {
 	if err != nil {
 		return errors.New("OTP expired")
 	}
-	if !password.ComparePassword(otpCode, storedOTP) {
+	if !password.ComparePassword(storedOTP, otpCode) {
 		return errors.New("invalid OTP")
 	}
 	updates := map[string]interface{}{
-		"is_verfied": true,
+		"is_verified": true,
 	}
 	if err := s.repo.UpdateByFields(&models.User{}, user.ID, updates); err != nil {
 		return err
@@ -119,7 +131,7 @@ func (s *AuthService) Login(emailStr, passwordStr string) (string, string, error
 	if user.IsBlocked {
 		return "", "", errors.New("user blocked")
 	}
-	if !password.ComparePassword(passwordStr, user.Password) {
+	if !password.ComparePassword(user.Password, passwordStr) {
 		return "", "", errors.New("invalid credentials")
 	}
 	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID.String(), user.Role)
@@ -139,7 +151,7 @@ func (s *AuthService) Login(emailStr, passwordStr string) (string, string, error
 		ID:        sessionID,
 		UserID:    user.ID,
 		Token:     password.HashToken(refreshToken),
-		ExpiresAt: time.Now().Add(time.Duration(s.cfg.JWT.RefreshTTLHours)),
+		ExpiresAt: time.Now().Add(time.Duration(s.cfg.JWT.RefreshTTLHours) * time.Hour),
 	}
 	if err := s.repo.Insert(&refresh); err != nil {
 		return "", "", err
@@ -181,4 +193,13 @@ func (s *AuthService) Refresh(token string) (string, string, error) {
 	s.repo.UpdateByFields(&models.RefreshToken{}, sessionID, updates)
 	return newAccess, newRefresh, nil
 
+}
+
+func (s *AuthService) Logout(token string) error {
+	claims, err := s.jwtManager.ValidateRefresh(token)
+	if err != nil {
+		return errors.New("invalid token")
+	}
+	sessionID := claims["session_id"].(string)
+	return s.repo.Delete(&models.RefreshToken{}, sessionID)
 }

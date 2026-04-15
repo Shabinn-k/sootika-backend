@@ -27,15 +27,11 @@ func (s *Service) SendMail(to, subject, body string) error {
 			"%s",
 		fromHeader, to, subject, body,
 	)
-	addr := fmt.Sprintf("%s:%d", s.cfg.SMTP.Host, s.cfg.DB.Port)
-	auth := smtp.PlainAuth(
-		"",
-		s.cfg.SMTP.Username,
-		s.cfg.SMTP.Password,
-		s.cfg.SMTP.Host,
-	)
-	return smtp.SendMail(addr, auth, from, []string{to}, []byte(msg))
 
+	addr := fmt.Sprintf("%s:%d", s.cfg.SMTP.Host, s.cfg.SMTP.Port)
+
+	auth := smtp.PlainAuth("", s.cfg.SMTP.Username, s.cfg.SMTP.Password, s.cfg.SMTP.Host)
+	return smtp.SendMail(addr, auth, from, []string{to}, []byte(msg))
 }
 
 func (s *Service) SendOTP(to string, otp string) error {

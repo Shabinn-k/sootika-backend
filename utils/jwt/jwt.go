@@ -8,7 +8,7 @@ import (
 )
 
 type Manager struct {
-	accessSecret string
+	accessSecret  string
 	refreshSecret string
 	accessTTL     time.Duration
 	refreshTTL    time.Duration
@@ -17,7 +17,7 @@ type Manager struct {
 
 func NewJWTManager(cfg *config.Config) *Manager {
 	return &Manager{
-		accessSecret: cfg.JWT.AccessSecret,
+		accessSecret:  cfg.JWT.AccessSecret,
 		refreshSecret: cfg.JWT.RefreshSecret,
 		accessTTL:     time.Duration(cfg.JWT.AccessTTLMinutes) * time.Minute,
 		refreshTTL:    time.Duration(cfg.JWT.RefreshTTLHours) * time.Hour,
