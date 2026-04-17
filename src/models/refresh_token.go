@@ -11,7 +11,7 @@ type RefreshToken struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null"`
 	Token     string    `gorm:"type:text;not null"`
-	ExpiresAt time.Time
+	ExpiresAt time.Time `gorm:"index"`
 	CreatedAt time.Time
 }
 

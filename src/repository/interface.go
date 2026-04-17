@@ -1,8 +1,15 @@
 package repository
 
+import "gorm.io/gorm"
+
 type PgSQLRepository interface {
 	Insert(req interface{}) error
 	FindOneWhere(obj interface{}, query string, args ...interface{}) error
 	UpdateByFields(obj interface{}, id interface{}, fields map[string]interface{}) error
 	Delete(obj interface{}, id interface{}) error
+	FindByID(obj interface{}, query string, args ...interface{}) error
+	FindAll(obj interface{}) error
+	FindWhere(obj interface{}, query string, args ...interface{}) error
+	Count(model interface{}, count *int64) error
+	GetDB() *gorm.DB
 }

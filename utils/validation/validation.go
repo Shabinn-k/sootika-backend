@@ -33,7 +33,6 @@ func validatePhone(fl validator.FieldLevel) bool {
 func validatePassword(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
 
-	// length check
 	if len(password) < 6 || len(password) > 20 {
 		return false
 	}

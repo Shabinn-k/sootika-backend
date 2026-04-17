@@ -33,8 +33,8 @@ func SetupDatabase(cfg *config.Config) *gorm.DB {
 		if err != nil {
 			log.Fatal("Failed to get Databse instance:", err)
 		}
-		sqlDB.SetMaxIdleConns(10)
-		sqlDB.SetMaxOpenConns(5)
+		sqlDB.SetMaxOpenConns(10)
+		sqlDB.SetMaxIdleConns(5)
 
 		pgDB = db
 		log.Println("Database connected Successfully")

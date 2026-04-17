@@ -25,3 +25,23 @@ func (r *Repository) UpdateByFields(obj interface{}, id interface{}, fields map[
 func (r *Repository) Delete(obj interface{}, id interface{}) error {
 	return r.DB.Where("id = ?", id).Delete(obj).Error
 }
+
+func (r *Repository)FindByID(obj interface{},query string,args ...interface{},)error{
+	return r.DB.Where(query,args...).First(obj).Error
+}
+
+func (r *Repository)FindAll(obj interface{})error{
+	return r.DB.Find(obj).Error
+}
+
+func (r *Repository)FindWhere(obj interface{},query string,args ...interface{})error{
+	return r.DB.Where(query,args...).Find(obj).Error
+}
+
+func (r *Repository)Count(model interface{},count *int64)error{
+	return r.DB.Model(model).Count(count).Error
+}
+
+func (r *Repository)GetDB()*gorm.DB{
+	return r.DB
+}
