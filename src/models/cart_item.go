@@ -24,3 +24,4 @@ func (ci *CartItem) BeforeCreate(tx *gorm.DB) error {
 	ci.ID = uuid.New()
 	return nil
 }
+

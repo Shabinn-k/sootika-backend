@@ -9,12 +9,11 @@ import (
 
 type WishlistItem struct {
 	ID         uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	WishlistID uuid.UUID `gorm:"type:uuid;not null;index" json:"wishlist_id"`
-	ProductID  uuid.UUID `gorm:"type:uuid;not null;index" json:"product_id"`
+	WishlistID uuid.UUID `gorm:"type:uuid;not null;index:idx_wishlist_product,unique"`
+	ProductID  uuid.UUID `gorm:"type:uuid;not null;index:idx_wishlist_product,unique"`
 	CreatedAt  time.Time `json:"created_at"`
-
-	Wishlist Wishlist `gorm:"foreignKey:WishlistID" json:"-"`
-	Product  Product  `gorm:"foreignKey:ProductID" json:"product,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	Product    Product   `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 func (wi *WishlistItem) BeforeCreate(tx *gorm.DB) error {

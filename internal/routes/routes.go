@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetUpRoutes(r *gin.Engine, authController *controllers.AuthController, jwtManager *jwt.Manager) {
+func SetUpRoutes(r *gin.Engine, authController *controllers.AuthController, jwtManager *jwt.Manager,productController *controllers.ProductController) {
 	auth := r.Group("/auth")
 	auth.POST("/signup", authController.Signup)
 	auth.POST("/check", authController.VerifyOTP)
