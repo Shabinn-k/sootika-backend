@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"time"
-
 	"github.com/redis/go-redis/v9"
 )
 
@@ -38,6 +37,7 @@ func NewRedis() *Redis {
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
+
 		log.Fatal("Redis connection failed:", err)
 	}
 
