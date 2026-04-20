@@ -8,14 +8,14 @@ import (
 )
 
 type Cart struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
-	Total     int       `gorm:"default:0" json:"total"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID     uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
 
-	User  User       `gorm:"foreignKey:UserID" json:"-"`
 	Items []CartItem `gorm:"foreignKey:CartID" json:"items,omitempty"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (c *Cart) BeforeCreate(tx *gorm.DB) error {

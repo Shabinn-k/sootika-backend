@@ -13,7 +13,7 @@ type WishlistService struct {
 	Repo repository.PgSQLRepository
 }
 
-func SetupWishlist(repo repository.PgSQLRepository) *WishlistService {
+func NewWishlistService(repo repository.PgSQLRepository) *WishlistService {
 	return &WishlistService{
 		Repo: repo,
 	}
@@ -29,7 +29,7 @@ func (s *WishlistService) AddToWishlist(userID, productID string) error {
 		return fmt.Errorf("Invalid product ID: %w", err)
 	}
 	var product models.Product
-	if err := s.Repo.FindByID(&product, "id = ?", productUUID); err != nil {
+	if err := s.Repo.FindByID(&product, productUUID); err != nil {
 		return errors.New("Product not found")
 	}
 	wishlist, err := s.getOrCreateWishlist(userUUID)
@@ -92,17 +92,23 @@ func (s *WishlistService) GetWishlist(userID string) (*models.Wishlist, error) {
 func (s *WishlistService) GetWishlistCount(userID string) (int, error) {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return 0, fmt.Errorf("Invalid user ID: %w", err)
+		return 0, fmt.Errorf("invalid user ID: %w", err)
 	}
+
 	var wishlist models.Wishlist
 	if err := s.Repo.FindOneWhere(&wishlist, "user_id = ?", userUUID); err != nil {
 		return 0, nil
 	}
-	var items []models.WishlistItem
-	if err := s.Repo.FindWhere(&items, "wishlist_id = ?", wishlist.ID); err != nil {
-		return 0, fmt.Errorf("Failed to get wishlist items: %w", err)
+
+	var count int64
+	if err := s.Repo.GetDB().
+		Model(&models.WishlistItem{}).
+		Where("wishlist_id = ?", wishlist.ID).
+		Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("failed to count wishlist items: %w", err)
 	}
-	return len(items), nil
+
+	return int(count), nil
 }
 
 func (s *WishlistService) IsInWishlist(userID, productID string) (bool, error) {

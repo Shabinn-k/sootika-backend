@@ -12,7 +12,7 @@ type ProductController struct {
 	Service *services.ProductService
 }
 
-func SetupProductController(service *services.ProductService) *ProductController{
+func NewProductController(service *services.ProductService) *ProductController {
 	return &ProductController{
 		Service: service,
 	}
@@ -155,7 +155,7 @@ func (p *ProductController)UpdateProductStock(c *gin.Context){
 
 
 func (p *ProductController)GetInStockProducts(c *gin.Context){
-	products,err:=p.Service.GetInStock()
+	products,err:=p.Service.GetInStockProducts()
 	if err!=nil{
 		c.JSON(constant.INTERNALSERVERERROR,gin.H{"error":err.Error()})
 		return
