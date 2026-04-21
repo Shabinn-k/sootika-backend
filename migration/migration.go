@@ -3,7 +3,6 @@ package migration
 import (
 	"golang/src/models"
 	"log"
-
 	"gorm.io/gorm"
 )
 
@@ -24,5 +23,6 @@ func Migrate(db *gorm.DB) {
     if err != nil {
         log.Fatal("Migration failed:", err)
     }
+    
     log.Println("Migration success")
 }

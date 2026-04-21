@@ -4,13 +4,11 @@ import (
 	"golang/src/models"
 	"golang/src/repository"
 	"golang/utils/constant"
-
 	"github.com/gin-gonic/gin"
 )
 
 func AdminMiddleware(repo repository.PgSQLRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		userIDRaw, exists := c.Get("user_id")
 		if !exists {
 			c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
@@ -45,7 +43,6 @@ func AdminMiddleware(repo repository.PgSQLRepository) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
 		c.Next()
 	}
 }

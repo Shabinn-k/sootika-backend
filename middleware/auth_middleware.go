@@ -4,7 +4,6 @@ import (
 	"golang/utils/constant"
 	"golang/utils/jwt"
 	"strings"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -57,7 +56,6 @@ func AuthMiddleware(jwtManager *jwt.Manager) gin.HandlerFunc {
 
 		c.Set("user_id", userID)
 		c.Set("role", role)
-
 		c.Next()
 	}
 }
