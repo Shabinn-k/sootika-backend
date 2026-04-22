@@ -29,7 +29,6 @@ func (s *Service) SendMail(to, subject, body string) error {
 	)
 
 	addr := fmt.Sprintf("%s:%d", s.cfg.SMTP.Host, s.cfg.SMTP.Port)
-
 	auth := smtp.PlainAuth("", s.cfg.SMTP.Username, s.cfg.SMTP.Password, s.cfg.SMTP.Host)
 	return smtp.SendMail(addr, auth, from, []string{to}, []byte(msg))
 }

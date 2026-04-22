@@ -57,7 +57,6 @@ func main() {
 
 	
 	r := gin.New()
- 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -65,7 +64,7 @@ func main() {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true, 
 	})) 
-
+ 
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
