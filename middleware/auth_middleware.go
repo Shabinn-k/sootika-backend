@@ -1,16 +1,16 @@
 package middleware
 
 import (
-	"strings"
 	"golang/utils/constant"
 	"golang/utils/jwt"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 func AuthMiddleware(jwtManager *jwt.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get token from Authorization header only
+
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Authorization header missing"})
@@ -27,7 +27,6 @@ func AuthMiddleware(jwtManager *jwt.Manager) gin.HandlerFunc {
 
 		token := parts[1]
 
-		// Validate access token
 		claims, err := jwtManager.ValidateAccessToken(token)
 		if err != nil {
 			c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Invalid or expired token"})
@@ -35,7 +34,6 @@ func AuthMiddleware(jwtManager *jwt.Manager) gin.HandlerFunc {
 			return
 		}
 
-		// Extract user info from claims
 		userID, ok := claims["user_id"].(string)
 		if !ok || userID == "" {
 			c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Invalid token claims"})
@@ -45,7 +43,6 @@ func AuthMiddleware(jwtManager *jwt.Manager) gin.HandlerFunc {
 
 		role, _ := claims["role"].(string)
 
-		// Set user info in context
 		c.Set("user_id", userID)
 		c.Set("role", role)
 

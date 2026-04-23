@@ -37,7 +37,7 @@ func SetUpRoutes(
 		products.GET("/", productController.GetAllProduct)
 		products.GET("/:id", productController.GetProductByID)
 		products.GET("/search", productController.SearchProducts, productController.GetProductsByTitle)
-		products.GET("stock", productController.GetInStockProducts)
+		products.GET("/stock", productController.GetInStockProducts)
 	}
 	wishlist := r.Group("/wishlist")
 	wishlist.Use(middleware.AuthMiddleware(jwtManager))
@@ -57,7 +57,7 @@ func SetUpRoutes(
 		cart.GET("/total", cartController.GetCartTotal)
 		cart.POST("/add", cartController.AddToCart)
 		cart.PUT("/update/:id", cartController.UpdateCartItemQuantity)
-		cart.DELETE("remove/:id", cartController.RemoveFromCart)
+		cart.DELETE("/remove/:id", cartController.RemoveFromCart)
 		cart.DELETE("/clear", cartController.ClearCart)
 	}
 	admin := r.Group("/admin")

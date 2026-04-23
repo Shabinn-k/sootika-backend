@@ -75,27 +75,27 @@ func (s *CartService) UpdateCartItemQuantity(userID, cartItemID string, quantity
 	if quantity <= 0 {
 		return errors.New("quantity must be greater than zero")
 	}
-	
+
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return fmt.Errorf("Invalid user ID: %w", err)
 	}
-	
+
 	itemUUID, err := uuid.Parse(cartItemID)
 	if err != nil {
 		return fmt.Errorf("Invalid cart item id: %w", err)
 	}
-	
+
 	var cart models.Cart
 	if err := s.Repo.FindOneWhere(&cart, "user_id = ?", userUUID); err != nil {
 		return errors.New("cart not found")
 	}
-	
+
 	var item models.CartItem
 	if err := s.Repo.FindOneWhere(&item, "id = ? AND cart_id = ?", itemUUID, cart.ID); err != nil {
 		return errors.New("Cart item not found")
 	}
-	
+
 	return s.Repo.UpdateByFields(&models.CartItem{}, item.ID, map[string]interface{}{
 		"quantity": quantity,
 	})

@@ -3,9 +3,10 @@ package services
 import (
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"golang/src/models"
 	"golang/src/repository"
+
+	"github.com/google/uuid"
 )
 
 type ProductService struct {
