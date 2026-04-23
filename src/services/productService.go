@@ -3,10 +3,11 @@ package services
 import (
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"golang/src/models"
 	"golang/src/repository"
-
-	"github.com/google/uuid"
+	"golang/utils/uploads"
+	"mime/multipart"
 )
 
 type ProductService struct {
@@ -17,45 +18,106 @@ func NewProductService(repo repository.PgSQLRepository) *ProductService {
 	return &ProductService{Repo: repo}
 }
 
-
+type CreateProductInput struct {
+	Title       string
+	Name        string
+	Description string
+	Price       int64
+	Stock       int
+	MainImage   *multipart.FileHeader
+	SecondImage *multipart.FileHeader
+	ThirdImage  *multipart.FileHeader
+}
 type UpdateProductInput struct {
 	Title       *string
 	Name        *string
 	Description *string
 	Price       *int64
-	MainImage   *string
-	SecondImage *string
-	ThirdImage  *string
+	MainImage   *multipart.FileHeader
+	SecondImage *multipart.FileHeader
+	ThirdImage  *multipart.FileHeader
 	InStock     *bool
 	Stock       *int
 }
 
-func (s *ProductService) CreateProduct(product *models.Product) error {
-	if product == nil {
-		return errors.New("Product data in nil")
+func (s *ProductService) CreateProduct(input *CreateProductInput) (*models.Product, error) {
+	if input == nil {
+		return nil, errors.New("Product data in nil")
 	}
-	if product.Title == "" {
-		return errors.New("Product title required")
+	if input.Title == "" {
+		return nil, errors.New("Product title required")
 	}
-	if product.Name == "" {
-		return errors.New("Product Name is required")
+	if input.Name == "" {
+		return nil, errors.New("Product Name is required")
 	}
-	if product.Price <= 0 {
-		return errors.New("Product Price must be Greater than 0")
+	if input.Price <= 0 {
+		return nil, errors.New("Product Price must be Greater than 0")
+	}
+	if input.MainImage == nil {
+		return nil, errors.New("Main image is required")
+	}
+	mainFile, err := input.MainImage.Open()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to open main image: %w", err)
+	}
+	defer mainFile.Close()
+	mainResult, err := uploads.UploadImageFile(mainFile, input.MainImage.Filename)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to upload main image: %w", err)
+	}
+	var secondResult *uploads.CloudinaryResult
+	if input.SecondImage != nil {
+		secondFile, err := input.SecondImage.Open()
+		if err == nil {
+			defer secondFile.Close()
+			secondResult, _ = uploads.UploadImageFile(secondFile, input.SecondImage.Filename)
+		}
+	}
+	var thirdResult *uploads.CloudinaryResult
+	if input.ThirdImage != nil {
+		thirdFile, err := input.ThirdImage.Open()
+		if err == nil {
+			defer thirdFile.Close()
+			thirdResult, _ = uploads.UploadImageFile(thirdFile, input.ThirdImage.Filename)
+		}
+	}
+
+	product := &models.Product{
+		Title:             input.Title,
+		Name:              input.Name,
+		Description:       input.Description,
+		Price:             input.Price,
+		Stock:             input.Stock,
+		InStock:           input.Stock > 0,
+		MainImage:         mainResult.URL,
+		MainImagePublicID: mainResult.PublicID,
+	}
+	if secondResult != nil {
+		product.SecondImage = secondResult.URL
+		product.SecondImagePublicID = secondResult.PublicID
+	}
+	if thirdResult != nil {
+		product.ThirdImage = thirdResult.URL
+		product.SecondImagePublicID = thirdResult.PublicID
 	}
 	if err := s.Repo.Insert(product); err != nil {
-		return fmt.Errorf("failed to create product: %w", err)
+		uploads.DeleteImage(mainResult.PublicID)
+		if secondResult != nil {
+			uploads.DeleteImage(secondResult.PublicID)
+		}
+		if thirdResult != nil {
+			uploads.DeleteImage(thirdResult.PublicID)
+		}
+		return nil, fmt.Errorf("Failed to create products: %w", err)
 	}
-	return nil
+	return product, nil
 }
 
 func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 	var products []models.Product
-
 	if err := s.Repo.FindAll(&products); err != nil {
 		return nil, fmt.Errorf("failed to fetch products: %w", err)
 	}
-
 	return products, nil
 }
 
@@ -64,12 +126,10 @@ func (s *ProductService) GetProductByID(productID string) (*models.Product, erro
 	if err != nil {
 		return nil, fmt.Errorf("invalid product id: %w", err)
 	}
-
 	var product models.Product
 	if err := s.Repo.FindByID(&product, productUUID); err != nil {
 		return nil, fmt.Errorf("product not found: %w", err)
 	}
-
 	return &product, nil
 }
 
@@ -129,16 +189,22 @@ func (s *ProductService) DeleteProduct(productID string) error {
 	if err != nil {
 		return fmt.Errorf("invalid product id: %w", err)
 	}
-
 	var product models.Product
 	if err := s.Repo.FindByID(&product, productUUID); err != nil {
 		return fmt.Errorf("product not found: %w", err)
 	}
-
+	if product.MainImagePublicID != "" {
+		uploads.DeleteImage(product.MainImagePublicID)
+	}
+	if product.SecondImagePublicID != "" {
+		uploads.DeleteImage(product.SecondImagePublicID)
+	}
+	if product.ThirdImagePublicID != "" {
+		uploads.DeleteImage(product.ThirdImagePublicID)
+	}
 	if err := s.Repo.Delete(&product, productUUID); err != nil {
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
-
 	return nil
 }
 
@@ -146,60 +212,39 @@ func (s *ProductService) UpdateProductStock(productID string, quantity int) erro
 	if quantity <= 0 {
 		return errors.New("invalid quantity")
 	}
-
 	product, err := s.GetProductByID(productID)
 	if err != nil {
 		return err
 	}
-
 	newStock := product.Stock - quantity
 	if newStock < 0 {
 		return errors.New("insufficient stock")
 	}
-
 	productUUID, _ := uuid.Parse(productID)
-
 	updates := map[string]interface{}{
 		"stock":    newStock,
 		"in_stock": newStock > 0,
 	}
-
 	if err := s.Repo.UpdateByFields(&models.Product{}, productUUID, updates); err != nil {
 		return fmt.Errorf("failed to update stock: %w", err)
 	}
-
 	return nil
 }
 
 func (s *ProductService) GetInStockProducts() ([]models.Product, error) {
 	var products []models.Product
-
 	if err := s.Repo.FindAllWhere(&products, "in_stock = ?", true); err != nil {
 		return nil, fmt.Errorf("failed to fetch in-stock products: %w", err)
 	}
-
 	return products, nil
 }
 
-func (s *ProductService) SearchProducts(searchTerm string) ([]models.Product, error) {
+func (s *ProductService) SearchProducts(term string) ([]models.Product, error) {
 	var products []models.Product
-
-	query := "name ILIKE ? OR description ILIKE ?"
-	searchPattern := "%" + searchTerm + "%"
-
-	if err := s.Repo.FindAllWhere(&products, query, searchPattern, searchPattern); err != nil {
+	searchPattern := "%" + term + "%"
+	query := `name ILIKE ? OR description ILIKE ? OR title ILIKE`
+	if err := s.Repo.FindAllWhere(&products, query, searchPattern, searchPattern, searchPattern); err != nil {
 		return nil, fmt.Errorf("failed to search products: %w", err)
 	}
-
-	return products, nil
-}
-
-func (s *ProductService) GetProductsByTitle(title string) ([]models.Product, error) {
-	var products []models.Product
-
-	if err := s.Repo.FindAllWhere(&products, "title ILIKE ?", "%"+title+"%"); err != nil {
-		return nil, fmt.Errorf("failed to fetch products by title: %w", err)
-	}
-
 	return products, nil
 }
