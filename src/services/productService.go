@@ -98,7 +98,7 @@ func (s *ProductService) CreateProduct(input *CreateProductInput) (*models.Produ
 	}
 	if thirdResult != nil {
 		product.ThirdImage = thirdResult.URL
-		product.SecondImagePublicID = thirdResult.PublicID
+		product.ThirdImagePublicID = thirdResult.PublicID
 	}
 	if err := s.Repo.Insert(product); err != nil {
 		uploads.DeleteImage(mainResult.PublicID)
@@ -154,15 +154,6 @@ func (s *ProductService) UpdateProduct(productID string, input *UpdateProductInp
 		}
 		updates["price"] = *input.Price
 	}
-	if input.MainImage != nil {
-		updates["main_image"] = *input.MainImage
-	}
-	if input.SecondImage != nil {
-		updates["second_image"] = *input.SecondImage
-	}
-	if input.ThirdImage != nil {
-		updates["third_image"] = *input.ThirdImage
-	}
 	if input.InStock != nil {
 		updates["in_stock"] = *input.InStock
 	}
@@ -182,6 +173,47 @@ func (s *ProductService) UpdateProduct(productID string, input *UpdateProductInp
 		return nil, fmt.Errorf("Failed to fetch updated product: %w", err)
 	}
 	return &product, nil
+}
+func (s *ProductService) UpdateProductImage(productID string, imageType string, newImage *multipart.FileHeader) error {
+	var product models.Product
+	if err := s.Repo.FindByID(&product, productID); err != nil {
+		return fmt.Errorf("product not found: %w", err)
+	}
+	file, err := newImage.Open()
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	result, err := uploads.UploadImageFile(file, newImage.Filename)
+	if err != nil {
+		return err
+	}
+	var oldPublicID string
+	switch imageType {
+	case "main":
+		oldPublicID = product.MainImagePublicID
+		product.MainImage = result.URL
+		product.MainImagePublicID = result.PublicID
+	case "second":
+		oldPublicID = product.SecondImagePublicID
+		product.SecondImage = result.URL
+		product.SecondImagePublicID = result.PublicID
+	case "third":
+		oldPublicID = product.ThirdImagePublicID
+		product.ThirdImage = result.URL
+		product.ThirdImagePublicID = result.PublicID
+	default:
+		return errors.New("invalid image type")
+	}
+	if oldPublicID != "" {
+		uploads.DeleteImage(oldPublicID)
+	}
+	updates := map[string]interface{}{
+		imageType + "_image":           result.URL,
+		imageType + "_image_public_id": result.PublicID,
+	}
+	return s.Repo.UpdateByFields(&models.Product{}, productID, updates)
 }
 
 func (s *ProductService) DeleteProduct(productID string) error {
@@ -242,7 +274,7 @@ func (s *ProductService) GetInStockProducts() ([]models.Product, error) {
 func (s *ProductService) SearchProducts(term string) ([]models.Product, error) {
 	var products []models.Product
 	searchPattern := "%" + term + "%"
-	query := `name ILIKE ? OR description ILIKE ? OR title ILIKE`
+	query := `name ILIKE ? OR description ILIKE ? OR title ILIKE ?`
 	if err := s.Repo.FindAllWhere(&products, query, searchPattern, searchPattern, searchPattern); err != nil {
 		return nil, fmt.Errorf("failed to search products: %w", err)
 	}
