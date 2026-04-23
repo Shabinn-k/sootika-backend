@@ -17,6 +17,7 @@ func NewProductService(repo repository.PgSQLRepository) *ProductService {
 	return &ProductService{Repo: repo}
 }
 
+
 type UpdateProductInput struct {
 	Title       *string
 	Name        *string
