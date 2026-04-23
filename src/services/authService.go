@@ -119,24 +119,24 @@ func (s *AuthService) VerifyOTP(emailStr, otpCode string) error {
 	return nil
 }
 
-func (s *AuthService) Login(emailStr, passwordStr string) (string, string, error) {
+func (s *AuthService) Login(emailStr, passwordStr string) (string, string,*models.User, error) {
 	var user models.User
 	err := s.repo.FindOneWhere(&user, "email = ?", emailStr)
 	if err != nil {
-		return "", "", errors.New("invalid credentials")
+		return "", "", nil,errors.New("invalid credentials")
 	}
 	if !user.IsVerified {
-		return "", "", errors.New("user not verified")
+		return "", "",nil, errors.New("user not verified")
 	}
 	if user.IsBlocked {
-		return "", "", errors.New("user blocked")
+		return "", "",nil, errors.New("user blocked")
 	}
 	if !password.ComparePassword(user.Password, passwordStr) {
-		return "", "", errors.New("invalid credentials")
+		return "", "", nil,errors.New("invalid credentials")
 	}
 	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID.String(), user.Role)
 	if err != nil {
-		return "", "", err
+		return "", "",nil, err
 	}
 	sessionID := uuid.New()
 	refreshToken, err := s.jwtManager.GenerateRefreshToken(
@@ -145,7 +145,7 @@ func (s *AuthService) Login(emailStr, passwordStr string) (string, string, error
 		sessionID.String(),
 	)
 	if err != nil {
-		return "", "", err
+		return "", "", nil,err
 	}
 	refresh := models.RefreshToken{
 		ID:        sessionID,
@@ -154,9 +154,9 @@ func (s *AuthService) Login(emailStr, passwordStr string) (string, string, error
 		ExpiresAt: time.Now().Add(time.Duration(s.cfg.JWT.RefreshTTLHours) * time.Hour),
 	}
 	if err := s.repo.Insert(&refresh); err != nil {
-		return "", "", err
+		return "", "", nil,err
 	}
-	return accessToken, refreshToken, nil
+	return accessToken, refreshToken,&user, nil
 }
 
 func (s *AuthService) Refresh(token string) (string, string, error) {
@@ -202,4 +202,9 @@ func (s *AuthService) Logout(token string) error {
 	}
 	sessionID := claims["session_id"].(string)
 	return s.repo.Delete(&models.RefreshToken{}, sessionID)
+}
+
+func (s *AuthService) GetDashboardStats(totalProducts, totalUsers *int64) {
+	s.repo.Count(&models.Product{}, totalProducts)	
+	s.repo.Count(&models.User{}, totalUsers)
 }

@@ -30,15 +30,18 @@ func SetUpRoutes(
 
 	user := r.Group("/user")
 	user.Use(middleware.AuthMiddleware(jwtManager))
-	user.GET("/dashboard", authController.Dashboard)
+	{
+		user.GET("/dashboard", authController.Dashboard)
+	}
 
 	products := r.Group("/products")
 	{
-		products.GET("/", productController.GetAllProduct)
+		products.GET("/search", productController.SearchProducts)
+		products.GET("/in-stock", productController.GetInStockProducts)
+		products.GET("/", productController.GetAllProducts)
 		products.GET("/:id", productController.GetProductByID)
-		products.GET("/search", productController.SearchProducts, productController.GetProductsByTitle)
-		products.GET("/stock", productController.GetInStockProducts)
 	}
+
 	wishlist := r.Group("/wishlist")
 	wishlist.Use(middleware.AuthMiddleware(jwtManager))
 	{
@@ -49,6 +52,7 @@ func SetUpRoutes(
 		wishlist.GET("/check/:id", wishlistController.IsInWishlist)
 		wishlist.DELETE("/clear", wishlistController.ClearWishlist)
 	}
+
 	cart := r.Group("/cart")
 	cart.Use(middleware.AuthMiddleware(jwtManager))
 	{
@@ -60,15 +64,18 @@ func SetUpRoutes(
 		cart.DELETE("/remove/:id", cartController.RemoveFromCart)
 		cart.DELETE("/clear", cartController.ClearCart)
 	}
+
 	admin := r.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(jwtManager))
 	admin.Use(middleware.AdminMiddleware(repo))
-	protected := admin.Group("/products")
 	{
-		protected.POST("/", productController.CreateProduct)
-		protected.PUT("/:id", productController.UpdateProduct)
-		protected.DELETE("/:id", productController.DeleteProduct)
-		protected.PATCH("/:id/stock", productController.UpdateProductStock)
+		adminProducts := admin.Group("/products")
+		{
+			adminProducts.POST("/", productController.CreateProduct)
+			adminProducts.PUT("/:id", productController.UpdateProduct)
+			adminProducts.DELETE("/:id", productController.DeleteProduct)
+			adminProducts.PATCH("/:id/stock", productController.UpdateProductStock)
+			adminProducts.PUT("/:id/image/:type", productController.UpdateProductImage)
+		}
 	}
-
 }

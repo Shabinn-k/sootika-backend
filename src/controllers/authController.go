@@ -75,7 +75,7 @@ func (a *AuthController) Login(c *gin.Context) {
 		c.JSON(constant.BADREQUEST, validation.FormatValidationErrors(err))
 		return
 	}
-	access, refresh, err := a.authService.Login(req.Email, req.Password)
+	access, refresh,user, err := a.authService.Login(req.Email, req.Password)
 	if err != nil {
 		logger.Log.Error("Login failed:", err)
 		c.JSON(constant.UNAUTHORIZED, gin.H{"error": err.Error()})
@@ -84,6 +84,7 @@ func (a *AuthController) Login(c *gin.Context) {
 	c.JSON(constant.SUCCESS, gin.H{
 		"access_token":  access,
 		"refresh_token": refresh,
+		"role":user.Role,
 	})
 }
 
@@ -123,13 +124,28 @@ func (a *AuthController) Logout(c *gin.Context) {
 	}
 	c.JSON(constant.SUCCESS, gin.H{"message": "Logged out successfully"})
 }
-
 func (a *AuthController) Dashboard(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	role, _ := c.Get("role")
 
+	if role == "admin" {
+		var totalProducts int64
+		var totalUsers int64
+		a.authService.GetDashboardStats(&totalProducts, &totalUsers)
+		c.JSON(constant.SUCCESS, gin.H{
+			"message": "Welcome to Admin Dashboard",
+			"admin_id": userID,
+			"role":    role,
+			"stats": gin.H{
+				"total_products":   totalProducts,
+				"total_users":      totalUsers,
+			},
+		})
+		return
+	}
+
 	c.JSON(constant.SUCCESS, gin.H{
-		"message": "Welcome to dashboard ",
+		"message": "Welcome to User Dashboard",
 		"user_id": userID,
 		"role":    role,
 	})
