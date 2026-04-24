@@ -23,17 +23,17 @@ func NewAdminController(
 	}
 }
 
-func (c *AdminController) Dashboard(ctx *gin.Context) {
-	userID, _ := ctx.Get("user_id")
-	role, _ := ctx.Get("role")
+func (a *AdminController) Dashboard(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	role, _ := c.Get("role")
 
 	var totalProducts int64
 	var totalUsers int64
 
-	c.repo.Count(&models.Product{}, &totalProducts)
-	c.repo.Count(&models.User{}, &totalUsers)
+	a.repo.Count(&models.Product{}, &totalProducts)
+	a.repo.Count(&models.User{}, &totalUsers)
 
-	ctx.JSON(constant.SUCCESS, gin.H{
+	c.JSON(constant.SUCCESS, gin.H{
 		"message":  "Welcome to Admin Dashboard",
 		"admin_id": userID,
 		"role":     role,
@@ -44,127 +44,127 @@ func (c *AdminController) Dashboard(ctx *gin.Context) {
 	})
 }
 
-func (c *AdminController) GetAllUsers(ctx *gin.Context) {
+func (a *AdminController) GetAllUsers(c *gin.Context) {
 	var users []models.User
-	if err := c.repo.FindAll(&users); err != nil {
-		ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
+	if err := a.repo.FindAll(&users); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
 		return
 	}
 	for i := range users {
 		users[i].Password = ""
 	}
-	ctx.JSON(constant.SUCCESS, gin.H{
+	c.JSON(constant.SUCCESS, gin.H{
 		"data":  users,
 		"count": len(users),
 	})
 }
 
-func (c *AdminController) GetUserByID(ctx *gin.Context) {
-	userID := ctx.Param("id")
+func (a *AdminController) GetUserByID(c *gin.Context) {
+	userID := c.Param("id")
 	if userID == "" {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
 		return
 	}
 	var user models.User
-	if err := c.repo.FindByID(&user, userID); err != nil {
-		ctx.JSON(constant.NOTFOUND, gin.H{"error": "User not found"})
+	if err := a.repo.FindByID(&user, userID); err != nil {
+		c.JSON(constant.NOTFOUND, gin.H{"error": "User not found"})
 		return
 	}
 	user.Password = ""
-	ctx.JSON(constant.SUCCESS, user)
+	c.JSON(constant.SUCCESS, user)
 }
 
-func (c *AdminController) UpdateUserRole(ctx *gin.Context) {
-	userID := ctx.Param("id")
+func (a *AdminController) UpdateUserRole(c *gin.Context) {
+	userID := c.Param("id")
 	if userID == "" {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
 		return
 	}
 	var req struct {
 		Role string `json:"role" binding:"required,oneof=user admin"`
 	}
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": err.Error()})
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(constant.BADREQUEST, gin.H{"error": err.Error()})
 		return
 	}
 	updates := map[string]interface{}{
 		"role": req.Role,
 	}
-	if err := c.repo.UpdateByFields(&models.User{}, userID, updates); err != nil {
-		ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to update user role"})
+	if err := a.repo.UpdateByFields(&models.User{}, userID, updates); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to update user role"})
 		return
 	}
-	ctx.JSON(constant.SUCCESS, gin.H{
+	c.JSON(constant.SUCCESS, gin.H{
 		"message": "User role updated successfully",
 		"role":    req.Role,
 	})
 }
 
-func (c *AdminController) ToggleBlockUser(ctx *gin.Context) {
-	userID := ctx.Param("id")
+func (a *AdminController) ToggleBlockUser(c *gin.Context) {
+	userID := c.Param("id")
 	if userID == "" {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
 		return
 	}
-	currentAdminID, _ := ctx.Get("user_id")
+	currentAdminID, _ := c.Get("user_id")
 	if userID == currentAdminID {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "You cannot block/unblock yourself"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "You cannot block/unblock yourself"})
 		return
 	}
 	var user models.User
-	if err := c.repo.FindByID(&user, userID); err != nil {
-		ctx.JSON(constant.NOTFOUND, gin.H{"error": "User not found"})
+	if err := a.repo.FindByID(&user, userID); err != nil {
+		c.JSON(constant.NOTFOUND, gin.H{"error": "User not found"})
 		return
 	}
 	newBlockStatus := !user.IsBlocked
 	updates := map[string]interface{}{
 		"is_blocked": newBlockStatus,
 	}
-	if err := c.repo.UpdateByFields(&models.User{}, userID, updates); err != nil {
-		ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to toggle user block status"})
+	if err := a.repo.UpdateByFields(&models.User{}, userID, updates); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to toggle user block status"})
 		return
 	}
 	message := "User unblocked successfully"
 	if newBlockStatus {
 		message = "User blocked successfully"
 	}
-	ctx.JSON(constant.SUCCESS, gin.H{
+	c.JSON(constant.SUCCESS, gin.H{
 		"message":    message,
 		"is_blocked": newBlockStatus,
 	})
 }
 
-func (c *AdminController) DeleteUser(ctx *gin.Context) {
-	userID := ctx.Param("id")
+func (a *AdminController) DeleteUser(c *gin.Context) {
+	userID := c.Param("id")
 	if userID == "" {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
 		return
 	}
-	currentAdminID, _ := ctx.Get("user_id")
+	currentAdminID, _ := c.Get("user_id")
 	if userID == currentAdminID {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "You cannot delete yourself"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "You cannot delete yourself"})
 		return
 	}
 	var user models.User
-	if err := c.repo.FindByID(&user, userID); err != nil {
-		ctx.JSON(constant.NOTFOUND, gin.H{"error": "User not found"})
+	if err := a.repo.FindByID(&user, userID); err != nil {
+		c.JSON(constant.NOTFOUND, gin.H{"error": "User not found"})
 		return
 	}
-	if err := c.repo.Delete(&user, userID); err != nil {
-		ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to delete user"})
+	if err := a.repo.Delete(&user, userID); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to delete user"})
 		return
 	}
-	ctx.JSON(constant.SUCCESS, gin.H{"message": "User deleted successfully"})
+	c.JSON(constant.SUCCESS, gin.H{"message": "User deleted successfully"})
 }
 
-func (c *AdminController) GetTotalProducts(ctx *gin.Context) {
+func (a *AdminController) GetTotalProducts(c *gin.Context) {
 	var count int64
-	c.repo.Count(&models.Product{}, &count)
-	ctx.JSON(constant.SUCCESS, gin.H{"total_products": count})
+	a.repo.Count(&models.Product{}, &count)
+	c.JSON(constant.SUCCESS, gin.H{"total_products": count})
 }
 
-func (c *AdminController) GetTotalUsers(ctx *gin.Context) {
+func (a *AdminController) GetTotalUsers(c *gin.Context) {
 	var count int64
-	c.repo.Count(&models.User{}, &count)
-	ctx.JSON(constant.SUCCESS, gin.H{"total_users": count})
+	a.repo.Count(&models.User{}, &count)
+	c.JSON(constant.SUCCESS, gin.H{"total_users": count})
 }
