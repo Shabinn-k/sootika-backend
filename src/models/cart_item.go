@@ -20,7 +20,6 @@ type CartItem struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (ci *CartItem) BeforeCreate(tx *gorm.DB) error {

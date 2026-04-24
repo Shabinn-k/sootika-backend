@@ -18,15 +18,15 @@ type Product struct {
 	SecondImage string `json:"second_image,omitempty"`
 	ThirdImage  string `json:"third_image,omitempty"`
 
-	MainImagePublicID   string         `json:"-"`
-	SecondImagePublicID string         `json:"-"`
-	ThirdImagePublicID  string         `json:"-"`
-	
-	InStock             bool           `gorm:"default:true" json:"in_stock"`
-	Stock               int            `gorm:"default:0" json:"stock"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index"`
+	MainImagePublicID   string `json:"-"`
+	SecondImagePublicID string `json:"-"`
+	ThirdImagePublicID  string `json:"-"`
+
+	InStock   bool           `gorm:"default:true" json:"in_stock"`
+	Stock     int            `gorm:"default:0" json:"stock"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 func (p *Product) BeforeCreate(tx *gorm.DB) error {

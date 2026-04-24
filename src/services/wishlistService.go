@@ -3,10 +3,9 @@ package services
 import (
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"golang/src/models"
 	"golang/src/repository"
-
-	"github.com/google/uuid"
 )
 
 type WishlistService struct {
@@ -173,5 +172,4 @@ func (s *WishlistService) loadWishlistItems(wishlist *models.Wishlist) error {
 	}
 	wishlist.Items = items
 	return nil
-
 }

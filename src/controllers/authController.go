@@ -1,12 +1,11 @@
 package controllers
 
 import (
+	"github.com/gin-gonic/gin"
 	"golang/src/services"
 	"golang/utils/constant"
 	"golang/utils/logger"
 	"golang/utils/validation"
-
-	"github.com/gin-gonic/gin"
 )
 
 type AuthController struct {
@@ -75,7 +74,7 @@ func (a *AuthController) Login(c *gin.Context) {
 		c.JSON(constant.BADREQUEST, validation.FormatValidationErrors(err))
 		return
 	}
-	access, refresh,user, err := a.authService.Login(req.Email, req.Password)
+	access, refresh, user, err := a.authService.Login(req.Email, req.Password)
 	if err != nil {
 		logger.Log.Error("Login failed:", err)
 		c.JSON(constant.UNAUTHORIZED, gin.H{"error": err.Error()})
@@ -84,7 +83,7 @@ func (a *AuthController) Login(c *gin.Context) {
 	c.JSON(constant.SUCCESS, gin.H{
 		"access_token":  access,
 		"refresh_token": refresh,
-		"role":user.Role,
+		"role":          user.Role,
 	})
 }
 
@@ -103,8 +102,8 @@ func (a *AuthController) Refresh(c *gin.Context) {
 		return
 	}
 	c.JSON(constant.SUCCESS, gin.H{
-		"access_token":  newAccess,
-		"refresh_token": newRefresh,
+		"new_access_token":  newAccess,
+		"new_refresh_token": newRefresh,
 	})
 }
 
@@ -124,29 +123,34 @@ func (a *AuthController) Logout(c *gin.Context) {
 	}
 	c.JSON(constant.SUCCESS, gin.H{"message": "Logged out successfully"})
 }
+
 func (a *AuthController) Dashboard(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	role, _ := c.Get("role")
-
+	user, err := a.authService.GetUserByID(userID.(string))
+	if err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "failed to get user info"})
+		return
+	}
 	if role == "admin" {
 		var totalProducts int64
 		var totalUsers int64
 		a.authService.GetDashboardStats(&totalProducts, &totalUsers)
 		c.JSON(constant.SUCCESS, gin.H{
-			"message": "Welcome to Admin Dashboard",
+			"message":  "Welcome to Admin Dashboard",
 			"admin_id": userID,
-			"role":    role,
+			"role":     role,
 			"stats": gin.H{
-				"total_products":   totalProducts,
-				"total_users":      totalUsers,
+				"total_products": totalProducts,
+				"total_users":    totalUsers,
 			},
 		})
 		return
 	}
-
 	c.JSON(constant.SUCCESS, gin.H{
 		"message": "Welcome to User Dashboard",
 		"user_id": userID,
+		"name":    user.Name,
 		"role":    role,
 	})
 }

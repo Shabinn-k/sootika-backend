@@ -28,14 +28,12 @@ type CreateProductInput struct {
 	SecondImage *multipart.FileHeader
 	ThirdImage  *multipart.FileHeader
 }
+
 type UpdateProductInput struct {
 	Title       *string
 	Name        *string
 	Description *string
 	Price       *int64
-	MainImage   *multipart.FileHeader
-	SecondImage *multipart.FileHeader
-	ThirdImage  *multipart.FileHeader
 	InStock     *bool
 	Stock       *int
 }

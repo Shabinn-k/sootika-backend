@@ -1,10 +1,9 @@
 package controllers
 
 import (
+	"github.com/gin-gonic/gin"
 	"golang/src/services"
 	"golang/utils/constant"
-
-	"github.com/gin-gonic/gin"
 )
 
 type CartController struct {
@@ -91,7 +90,7 @@ func (s *CartController) RemoveFromCart(c *gin.Context) {
 	}
 	cartItemID := c.Param("item_id")
 	if cartItemID == "" {
-		c.JSON(constant.BADREQUEST, gin.H{"erorr": "Cart item ID is required"})
+		c.JSON(constant.BADREQUEST, gin.H{"error": "Cart item ID is required"})
 		return
 	}
 	if err := s.Services.RemoveFromCart(userID.(string), cartItemID); err != nil {

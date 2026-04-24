@@ -11,7 +11,10 @@ func SetUpRepo(db *gorm.DB) *Repository {
 }
 
 func (r *Repository) Insert(req interface{}) error {
-	return r.DB.Create(req).Error
+	if err := r.DB.Debug().Create(req).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *Repository) UpdateByFields(obj interface{}, id interface{}, fields map[string]interface{}) error {

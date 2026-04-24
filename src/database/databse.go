@@ -3,11 +3,10 @@ package database
 import (
 	"fmt"
 	"golang/config"
-	"log"
-	"sync"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"log"
+	"sync"
 )
 
 var pgOnce sync.Once

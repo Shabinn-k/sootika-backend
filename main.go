@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
 	"golang/config"
 	"golang/internal/cache"
 	"golang/internal/routes"
@@ -14,8 +15,6 @@ import (
 	"golang/utils/logger"
 	"golang/utils/validation"
 	"log"
-
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -47,13 +46,23 @@ func main() {
 	productController := controllers.NewProductController(productService)
 	wishlistController := controllers.NewWishlistController(wishlistService)
 	cartController := controllers.NewCartController(cartService)
+	adminController := controllers.NewAdminController(productService, repo)
 
 	r := gin.Default()
 
-	routes.SetUpRoutes(r, authController, jwtManager, productController, wishlistController, cartController, repo)
-	logger.Log.Info("server running on port", cfg.Server.Port)
+	routes.SetUpRoutes(
+		r,
+		authController,
+		jwtManager,
+		productController,
+		wishlistController,
+		cartController,
+		adminController,
+		repo,
+	)
 
+	logger.Log.Info("Server running on port", cfg.Server.Port)
 	if err := r.Run(":" + cfg.Server.Port); err != nil {
-		log.Fatal("Server failed", err)
+		log.Fatal("Server failed to start:", err)
 	}
 }

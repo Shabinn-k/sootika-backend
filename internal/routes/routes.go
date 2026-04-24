@@ -16,6 +16,7 @@ func SetUpRoutes(
 	productController *controllers.ProductController,
 	wishlistController *controllers.WishlistController,
 	cartController *controllers.CartController,
+	adminController *controllers.AdminController,
 	repo *repository.Repository,
 ) {
 
@@ -30,16 +31,14 @@ func SetUpRoutes(
 
 	user := r.Group("/user")
 	user.Use(middleware.AuthMiddleware(jwtManager))
-	{
-		user.GET("/dashboard", authController.Dashboard)
-	}
+	user.GET("/dashboard", authController.Dashboard)
 
 	products := r.Group("/products")
 	{
-		products.GET("/search", productController.SearchProducts)
-		products.GET("/in-stock", productController.GetInStockProducts)
 		products.GET("/", productController.GetAllProducts)
 		products.GET("/:id", productController.GetProductByID)
+		products.GET("/search", productController.SearchProducts)
+		products.GET("/in-stock", productController.GetInStockProducts)
 	}
 
 	wishlist := r.Group("/wishlist")
@@ -48,8 +47,8 @@ func SetUpRoutes(
 		wishlist.GET("/", wishlistController.GetWishlist)
 		wishlist.GET("/count", wishlistController.GetWishlistCount)
 		wishlist.POST("/add", wishlistController.AddToWishlist)
-		wishlist.DELETE("/remove/:id", wishlistController.RemoveFromWishlist)
-		wishlist.GET("/check/:id", wishlistController.IsInWishlist)
+		wishlist.GET("/check/:product_id", wishlistController.IsInWishlist)
+		wishlist.DELETE("/remove/:product_id", wishlistController.RemoveFromWishlist)
 		wishlist.DELETE("/clear", wishlistController.ClearWishlist)
 	}
 
@@ -60,8 +59,8 @@ func SetUpRoutes(
 		cart.GET("/count", cartController.GetCartCount)
 		cart.GET("/total", cartController.GetCartTotal)
 		cart.POST("/add", cartController.AddToCart)
-		cart.PUT("/update/:id", cartController.UpdateCartItemQuantity)
-		cart.DELETE("/remove/:id", cartController.RemoveFromCart)
+		cart.PUT("/update/:item_id", cartController.UpdateCartItemQuantity)
+		cart.DELETE("/remove/:item_id", cartController.RemoveFromCart)
 		cart.DELETE("/clear", cartController.ClearCart)
 	}
 
@@ -69,13 +68,20 @@ func SetUpRoutes(
 	admin.Use(middleware.AuthMiddleware(jwtManager))
 	admin.Use(middleware.AdminMiddleware(repo))
 	{
+		admin.GET("/dashboard", adminController.Dashboard)
+		admin.GET("/users", adminController.GetAllUsers)
+		admin.GET("/users/:id", adminController.GetUserByID)
+		admin.PUT("/users/:id/role", adminController.UpdateUserRole)
+		admin.PUT("/users/:id/toggle-block", adminController.ToggleBlockUser)
+		admin.DELETE("/users/:id", adminController.DeleteUser)
+		admin.GET("/stats/products", adminController.GetTotalProducts)
+
 		adminProducts := admin.Group("/products")
 		{
 			adminProducts.POST("/", productController.CreateProduct)
 			adminProducts.PUT("/:id", productController.UpdateProduct)
-			adminProducts.DELETE("/:id", productController.DeleteProduct)
-			adminProducts.PATCH("/:id/stock", productController.UpdateProductStock)
 			adminProducts.PUT("/:id/image/:type", productController.UpdateProductImage)
+			adminProducts.DELETE("/:id", productController.DeleteProduct)
 		}
 	}
 }

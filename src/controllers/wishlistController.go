@@ -1,10 +1,9 @@
 package controllers
 
 import (
+	"github.com/gin-gonic/gin"
 	"golang/src/services"
 	"golang/utils/constant"
-
-	"github.com/gin-gonic/gin"
 )
 
 type WishlistController struct {

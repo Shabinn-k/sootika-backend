@@ -1,10 +1,8 @@
 package models
 
 import (
-	"time"
-
 	"github.com/google/uuid"
-	"gorm.io/gorm"
+	"time"
 )
 
 type RefreshToken struct {
@@ -13,9 +11,6 @@ type RefreshToken struct {
 	Token     string    `gorm:"type:text;not null"`
 	ExpiresAt time.Time `gorm:"index"`
 	CreatedAt time.Time
-}
-
-func (r *RefreshToken) BeforeCreate(tx *gorm.DB) error {
-	r.ID = uuid.New()
-	return nil
+	UpdatedAt time.Time
+	User      User `gorm:"foreignKey:UserID"`
 }

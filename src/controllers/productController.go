@@ -47,7 +47,6 @@ func (p *ProductController) CreateProduct(c *gin.Context) {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "invalid price format"})
 		return
 	}
-
 	stock := 0
 	if stockStr != "" {
 		stock, err = strconv.Atoi(stockStr)
@@ -95,13 +94,11 @@ func (p *ProductController) GetProductByID(c *gin.Context) {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Product ID is required"})
 		return
 	}
-
 	product, err := p.Service.GetProductByID(productID)
 	if err != nil {
 		c.JSON(constant.NOTFOUND, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(constant.SUCCESS, product)
 }
 
@@ -111,7 +108,6 @@ func (p *ProductController) GetAllProducts(c *gin.Context) {
 		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(constant.SUCCESS, gin.H{
 		"data":  products,
 		"count": len(products),
@@ -124,7 +120,6 @@ func (p *ProductController) UpdateProduct(c *gin.Context) {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Product ID is required"})
 		return
 	}
-
 	var req struct {
 		Title       *string `json:"title"`
 		Name        *string `json:"name"`
@@ -159,7 +154,7 @@ func (p *ProductController) UpdateProduct(c *gin.Context) {
 
 func (p *ProductController) UpdateProductImage(c *gin.Context) {
 	productID := c.Param("id")
-	imageType := c.Param("type") // main, second, third
+	imageType := c.Param("type")
 
 	if productID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Product ID is required"})
@@ -202,29 +197,6 @@ func (p *ProductController) DeleteProduct(c *gin.Context) {
 	c.JSON(constant.SUCCESS, gin.H{"message": "Product deleted successfully"})
 }
 
-func (p *ProductController) UpdateProductStock(c *gin.Context) {
-	productID := c.Param("id")
-	if productID == "" {
-		c.JSON(constant.BADREQUEST, gin.H{"error": "Product ID is required"})
-		return
-	}
-
-	var req struct {
-		Quantity int `json:"quantity" binding:"required,gt=0"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(constant.BADREQUEST, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := p.Service.UpdateProductStock(productID, req.Quantity); err != nil {
-		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(constant.SUCCESS, gin.H{"message": "Stock updated successfully"})
-}
-
 func (p *ProductController) GetInStockProducts(c *gin.Context) {
 	products, err := p.Service.GetInStockProducts()
 	if err != nil {
@@ -238,13 +210,13 @@ func (p *ProductController) GetInStockProducts(c *gin.Context) {
 	})
 }
 
-func (pc *ProductController) SearchProducts(c *gin.Context) {
+func (p *ProductController) SearchProducts(c *gin.Context) {
 	term := c.Query("q")
 	if term == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "search query required"})
 		return
 	}
-	products, err := pc.Service.SearchProducts(term)
+	products, err := p.Service.SearchProducts(term)
 	if err != nil {
 		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
 		return
