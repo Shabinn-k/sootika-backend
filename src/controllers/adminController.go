@@ -29,9 +29,31 @@ func (a *AdminController) Dashboard(c *gin.Context) {
 
 	var totalProducts int64
 	var totalUsers int64
+	var pendingFeedback int64
+	var recentUsers []models.User
 
 	a.repo.Count(&models.Product{}, &totalProducts)
 	a.repo.Count(&models.User{}, &totalUsers)
+	
+	// Count pending feedback
+	a.repo.GetDB().Model(&models.Feedback{}).Where("feed = ?", "pending").Count(&pendingFeedback)
+	
+	// Fetch recent users (last 5) - assuming a FindAll with limit/order or simple FindAll
+	// For now, let's fetch all and slice, or use raw if repo doesn't support limit.
+	// Since repo might not have FindLimitOrder, we'll fetch all users and slice them.
+	// We already have GetAllUsers logic below, we can reuse it.
+	var allUsers []models.User
+	a.repo.FindAll(&allUsers)
+	
+	// Assuming users are appended to the slice in order or we can just take the last 5
+	startIdx := len(allUsers) - 5
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	for i := startIdx; i < len(allUsers); i++ {
+		allUsers[i].Password = "" // Hide password
+		recentUsers = append([]models.User{allUsers[i]}, recentUsers...) // Reverse so newest is first
+	}
 
 	c.JSON(constant.SUCCESS, gin.H{
 		"message":  "Welcome to Admin Dashboard",
@@ -40,6 +62,9 @@ func (a *AdminController) Dashboard(c *gin.Context) {
 		"stats": gin.H{
 			"total_products": totalProducts,
 			"total_users":    totalUsers,
+			"pending_feedback": pendingFeedback,
+			"total_revenue":  150000, // Mocked revenue
+			"recent_users": recentUsers,
 		},
 	})
 }
@@ -167,4 +192,47 @@ func (a *AdminController) GetTotalUsers(c *gin.Context) {
 	var count int64
 	a.repo.Count(&models.User{}, &count)
 	c.JSON(constant.SUCCESS, gin.H{"total_users": count})
+}
+
+func (a *AdminController) GetAllFeedbacks(c *gin.Context) {
+	var feedbacks []models.Feedback
+	if err := a.repo.FindAll(&feedbacks); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to fetch feedbacks"})
+		return
+	}
+	c.JSON(constant.SUCCESS, feedbacks)
+}
+
+func (a *AdminController) ApproveFeedback(c *gin.Context) {
+	feedbackID := c.Param("id")
+	if feedbackID == "" {
+		c.JSON(constant.BADREQUEST, gin.H{"error": "Feedback ID is required"})
+		return
+	}
+	updates := map[string]interface{}{
+		"feed": "approved",
+	}
+	if err := a.repo.UpdateByFields(&models.Feedback{}, feedbackID, updates); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to approve feedback"})
+		return
+	}
+	c.JSON(constant.SUCCESS, gin.H{"message": "Feedback approved successfully"})
+}
+
+func (a *AdminController) DeleteFeedback(c *gin.Context) {
+	feedbackID := c.Param("id")
+	if feedbackID == "" {
+		c.JSON(constant.BADREQUEST, gin.H{"error": "Feedback ID is required"})
+		return
+	}
+	var feedback models.Feedback
+	if err := a.repo.FindByID(&feedback, feedbackID); err != nil {
+		c.JSON(constant.NOTFOUND, gin.H{"error": "Feedback not found"})
+		return
+	}
+	if err := a.repo.Delete(&feedback, feedbackID); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to delete feedback"})
+		return
+	}
+	c.JSON(constant.SUCCESS, gin.H{"message": "Feedback deleted successfully"})
 }

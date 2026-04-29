@@ -13,7 +13,6 @@ func Migrate(db *gorm.DB) {
 		&models.RefreshToken{},
 		&models.Product{},
 		&models.Cart{},
-		&models.Cart{},
 		&models.CartItem{},
 		&models.Wishlist{},
 		&models.WishlistItem{},

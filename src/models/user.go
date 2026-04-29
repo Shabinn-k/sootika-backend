@@ -15,9 +15,9 @@ type User struct {
 	Password string `binding:"required,min=6,password" gorm:"not null" json:"-"`
 	Phone    string `gorm:"type:varchar(15);uniqueIndex;not null"`
 
-	Role       string `gorm:"type:varchar(20);default:user"`
-	IsBlocked  bool   `gorm:"default:false"`
-	IsVerified bool   `gorm:"default:false"`
+	Role       string `gorm:"type:varchar(20);default:user" json:"role"`
+	IsBlocked  bool   `gorm:"default:false" json:"is_blocked"`
+	IsVerified bool   `gorm:"default:false" json:"is_verified"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
