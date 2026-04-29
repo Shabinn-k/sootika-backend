@@ -68,6 +68,23 @@ func (a *AuthController) VerifyOTP(c *gin.Context) {
 	})
 }
 
+type ResendOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+func (c *AuthController) ResendOTP(ctx *gin.Context) {
+	var req ResendOTPRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(constant.BADREQUEST, validation.FormatValidationErrors(err))
+		return
+	}
+	if err := c.authService.ResendOTP(req.Email); err != nil {
+		ctx.JSON(constant.BADREQUEST, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.JSON(constant.SUCCESS, gin.H{"message": "OTP resent successfully"})
+}
+
 func (a *AuthController) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

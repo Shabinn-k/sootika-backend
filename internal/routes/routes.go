@@ -20,14 +20,16 @@ func SetUpRoutes(
     adminController *controllers.AdminController,
     repo *repository.Repository,
 )  {
-	  r.Use(cors.New(cors.Config{
-        AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"}, 
-        AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-        AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-        ExposeHeaders:    []string{"Content-Length"},
-        AllowCredentials: true,
-        MaxAge:           12 * time.Hour,
-    }))
+	r.Use(cors.New(cors.Config{
+		AllowOriginFunc: func(origin string) bool {
+			return true // Allow all origins for development
+		},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 	r.GET("/api/test", func(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "backend connected",
@@ -37,6 +39,7 @@ func SetUpRoutes(
 	{
 		auth.POST("/signup", authController.Signup)
 		auth.POST("/check", authController.VerifyOTP)
+		auth.POST("/resend-otp", authController.ResendOTP) 
 		auth.POST("/login", authController.Login)
 		auth.POST("/refresh", authController.Refresh)
 		auth.POST("/logout", authController.Logout)
@@ -78,27 +81,28 @@ func SetUpRoutes(
 	}
 
 	admin := r.Group("/admin")
-	admin.Use(middleware.AuthMiddleware(jwtManager))
-	admin.Use(middleware.AdminMiddleware(repo))
-	{
-		admin.GET("/dashboard", adminController.Dashboard)
-		admin.GET("/users", adminController.GetAllUsers)
-		admin.GET("/users/:id", adminController.GetUserByID)
-		admin.PUT("/users/:id/role", adminController.UpdateUserRole)
-		admin.PUT("/users/:id/toggle-block", adminController.ToggleBlockUser)
-		admin.DELETE("/users/:id", adminController.DeleteUser)
-		admin.GET("/stats/products", adminController.GetTotalProducts)
+admin.Use(middleware.AuthMiddleware(jwtManager))
+admin.Use(middleware.AdminMiddleware(repo))
+{
+    admin.GET("/dashboard", adminController.Dashboard)
+    admin.GET("/users", adminController.GetAllUsers)
+    admin.GET("/users/:id", adminController.GetUserByID)
+    admin.PUT("/users/:id/role", adminController.UpdateUserRole)
+    admin.PUT("/users/:id/toggle-block", adminController.ToggleBlockUser)
+    admin.DELETE("/users/:id", adminController.DeleteUser)
+    admin.GET("/stats/products", adminController.GetTotalProducts)
 
-		admin.GET("/feedbacks", adminController.GetAllFeedbacks)
-		admin.PUT("/feedbacks/:id/approve", adminController.ApproveFeedback)
-		admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
+    admin.GET("/feedbacks", adminController.GetAllFeedbacks)
+    admin.PUT("/feedbacks/:id/approve", adminController.ApproveFeedback)
+    admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
 
-		adminProducts := admin.Group("/products")
-		{
-			adminProducts.POST("/", productController.CreateProduct)
-			adminProducts.PUT("/:id", productController.UpdateProduct)
-			adminProducts.PUT("/:id/image/:type", productController.UpdateProductImage)
-			adminProducts.DELETE("/:id", productController.DeleteProduct)
-		}
-	}
+
+    admin.POST("/products", productController.CreateProduct)
+    admin.PUT("/products/:id", productController.UpdateProduct)
+    admin.PUT("/products/:id/image/:type", productController.UpdateProductImage)
+    admin.DELETE("/products/:id", productController.DeleteProduct)
+}
+admin.GET("/test", func(c *gin.Context) {
+    c.JSON(200, gin.H{"message": "Admin endpoint working"})
+})
 }

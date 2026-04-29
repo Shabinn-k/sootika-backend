@@ -85,7 +85,13 @@ func FormatValidationErrors(err error) gin.H {
 		errors = append(errors, "Invalid request body")
 	}
 
+	if len(errors) > 0 {
+		return gin.H{
+			"error": errors[0],
+		}
+	}
+
 	return gin.H{
-		"errors": errors,
+		"error": "Validation failed",
 	}
 }

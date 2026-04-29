@@ -44,7 +44,12 @@ func (s *AuthService) Signup(name, emailStr, phone, passwordStr string) error {
 	var existing models.User
 	err := s.repo.FindOneWhere(&existing, "email = ?", emailStr)
 	if err == nil {
-		return errors.New("email already exist")
+		if existing.IsVerified {
+			return errors.New("email already exist")
+		} else {
+			// Delete unverified user to allow fresh signup
+			s.repo.Delete(&models.User{}, existing.ID)
+		}
 	}
 	otpcode, err := otp.GenerateOTP()
 	if err != nil {
@@ -107,6 +112,39 @@ func (s *AuthService) VerifyOTP(emailStr, otpCode string) error {
 		return err
 	}
 	s.redis.Client.Del(cache.Ctx, key)
+	return nil
+}
+
+func (s *AuthService) ResendOTP(emailStr string) error {
+	var user models.User
+	err := s.repo.FindOneWhere(&user, "email = ?", emailStr)
+	if err != nil {
+		return errors.New("user not found")
+	}
+	if user.IsVerified {
+		return errors.New("already verified")
+	}
+
+	otpcode, err := otp.GenerateOTP()
+	if err != nil {
+		return err
+	}
+	hashedOTP, err := password.HashPassword(otpcode)
+	if err != nil {
+		return err
+	}
+	if err := s.emailService.SendOTP(emailStr, otpcode); err != nil {
+		return err
+	}
+
+	key := "otp:verify:" + emailStr
+	s.redis.Client.Set(
+		cache.Ctx,
+		key,
+		hashedOTP,
+		time.Duration(s.cfg.OTP.ExpiryMinutes)*time.Minute,
+	)
+	logger.Log.Infof("OTP resent to %s", emailStr)
 	return nil
 }
 

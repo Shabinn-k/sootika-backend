@@ -19,6 +19,12 @@ func NewProductController(service *services.ProductService) *ProductController {
 }
 
 func (p *ProductController) CreateProduct(c *gin.Context) {
+	// Parse multipart form (max 32MB)
+	if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
+		c.JSON(constant.BADREQUEST, gin.H{"error": "Failed to parse multipart form"})
+		return
+	}
+
 	title := c.PostForm("title")
 	name := c.PostForm("name")
 	description := c.PostForm("description")
