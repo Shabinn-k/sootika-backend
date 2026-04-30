@@ -17,9 +17,9 @@ import (
 )
 
 type PaymentService struct {
-    repo      repository.PgSQLRepository
-    client    *razorpay.Client
-    keySecret string
+    repo       repository.PgSQLRepository
+    client     *razorpay.Client
+    keySecret  string
 }
 
 func NewPaymentService(repo repository.PgSQLRepository, cfg *config.Config) *PaymentService {
@@ -32,7 +32,6 @@ func NewPaymentService(repo repository.PgSQLRepository, cfg *config.Config) *Pay
     }
 }
 
-// CreateOrder creates a Razorpay order
 func (s *PaymentService) CreateOrder(amount int64, currency string, receipt string, userID uuid.UUID) (map[string]interface{}, error) {
     if amount <= 0 {
         return nil, errors.New("invalid amount")
@@ -69,9 +68,7 @@ func (s *PaymentService) CreateOrder(amount int64, currency string, receipt stri
     return order, nil
 }
 
-// VerifyPayment verifies payment signature and updates order
 func (s *PaymentService) VerifyPayment(orderID, paymentID, signature string, orderUUID uuid.UUID, userID uuid.UUID) (bool, error) {
-    // Start transaction
     tx := s.repo.BeginTransaction()
     defer func() {
         if r := recover(); r != nil {
@@ -92,7 +89,6 @@ func (s *PaymentService) VerifyPayment(orderID, paymentID, signature string, ord
         return false, errors.New("signature verification failed")
     }
     
-    // Update payment record
     updates := map[string]interface{}{
         "razorpay_payment_id": paymentID,
         "razorpay_signature":  signature,
@@ -105,7 +101,6 @@ func (s *PaymentService) VerifyPayment(orderID, paymentID, signature string, ord
         return false, fmt.Errorf("failed to update payment status: %w", err)
     }
     
-    // Update actual order payment status
     orderUpdates := map[string]interface{}{
         "payment_status":      "paid",
         "razorpay_payment_id": paymentID,
@@ -131,10 +126,9 @@ func (s *PaymentService) generateSignature(orderID, paymentID string) string {
     return hex.EncodeToString(h.Sum(nil))
 }
 
-// HandleWebhook processes Razorpay webhook
 func (s *PaymentService) HandleWebhook(body []byte, signature string) error {
-    secret := s.keySecret
-    expectedSignature := s.generateWebhookSignature(body, secret)
+    // Generate signature using key secret if webhook secret not available
+    expectedSignature := s.generateWebhookSignature(body, s.keySecret)
     
     if !hmac.Equal([]byte(expectedSignature), []byte(signature)) {
         return errors.New("invalid webhook signature")
@@ -172,7 +166,6 @@ func (s *PaymentService) HandleWebhook(body []byte, signature string) error {
             return errors.New("invalid payment ID")
         }
         
-        // Use transaction for webhook
         tx := s.repo.BeginTransaction()
         defer func() {
             if r := recover(); r != nil {
@@ -189,7 +182,6 @@ func (s *PaymentService) HandleWebhook(body []byte, signature string) error {
             }
             tx.UpdateByFields(&models.Payment{}, paymentRecord.ID, updates)
             
-            // Update order if linked
             if paymentRecord.OrderID != "" {
                 orderUpdates := map[string]interface{}{
                     "payment_status": "paid",
@@ -211,7 +203,6 @@ func (s *PaymentService) generateWebhookSignature(body []byte, secret string) st
     return hex.EncodeToString(h.Sum(nil))
 }
 
-// FetchPayment fetches payment details from Razorpay
 func (s *PaymentService) FetchPayment(paymentID string) (map[string]interface{}, error) {
     payment, err := s.client.Payment.Fetch(paymentID, nil, nil)
     if err != nil {
@@ -220,7 +211,6 @@ func (s *PaymentService) FetchPayment(paymentID string) (map[string]interface{},
     return payment, nil
 }
 
-// RefundPayment initiates a refund
 func (s *PaymentService) RefundPayment(paymentID string, amount int64) (map[string]interface{}, error) {
     if amount <= 0 {
         return nil, errors.New("invalid refund amount")

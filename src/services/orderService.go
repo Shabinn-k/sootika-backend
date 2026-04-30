@@ -22,7 +22,6 @@ type OrderItemInput struct {
     Quantity  int
 }
 
-// ⚠️ CRITICAL FIX: CreateOrder with transaction using repository methods
 func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, addressID uuid.UUID, paymentMethod string) (*models.Order, error) {
     var user models.User
     if err := s.repo.FindByID(&user, userID); err != nil {
@@ -41,6 +40,7 @@ func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, add
     var subtotal int64
     var orderItems []models.OrderItem
     
+    // First validate all products have sufficient stock
     for _, item := range items {
         var product models.Product
         if err := s.repo.FindByID(&product, item.ProductID); err != nil {
@@ -48,7 +48,8 @@ func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, add
         }
         
         if product.Stock < item.Quantity {
-            return nil, fmt.Errorf("insufficient stock for product: %s", product.Name)
+            return nil, fmt.Errorf("insufficient stock for product: %s (available: %d, requested: %d)", 
+                product.Name, product.Stock, item.Quantity)
         }
         
         total := product.Price * int64(item.Quantity)
@@ -70,7 +71,7 @@ func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, add
     discount := int64(0)
     total := subtotal + shippingCost + tax - discount
     
-orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8])    
+    orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8])
     order := &models.Order{
         OrderNumber:     orderNumber,
         UserID:          userID,
@@ -86,7 +87,6 @@ orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8]
         ShippingAddress: address,
     }
     
-    // ⚠️ FIX: Use repository transaction methods directly
     tx := s.repo.BeginTransaction()
     defer func() {
         if r := recover(); r != nil {
@@ -110,10 +110,20 @@ orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8]
         var product models.Product
         if err := tx.FindByID(&product, orderItems[i].ProductID); err == nil {
             stockUpdates := map[string]interface{}{
-                "stock": product.Stock - orderItems[i].Quantity,
+                "stock":    product.Stock - orderItems[i].Quantity,
+                "in_stock": (product.Stock - orderItems[i].Quantity) > 0,
             }
-            tx.UpdateByFields(&models.Product{}, product.ID, stockUpdates)
+            if err := tx.UpdateByFields(&models.Product{}, product.ID, stockUpdates); err != nil {
+                tx.Rollback()
+                return nil, fmt.Errorf("failed to update product stock: %w", err)
+            }
         }
+    }
+    
+    // Clear user's cart after successful order
+    var cart models.Cart
+    if err := tx.FindOneWhere(&cart, "user_id = ?", userID); err == nil {
+        tx.DeleteWhere(&models.CartItem{}, "cart_id = ?", cart.ID)
     }
     
     if err := tx.Commit(); err != nil {
@@ -124,7 +134,6 @@ orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8]
     return order, nil
 }
 
-// GetUserOrders gets all orders for a user
 func (s *OrderService) GetUserOrders(userID uuid.UUID) ([]models.Order, error) {
     var orders []models.Order
     if err := s.repo.FindAllWhere(&orders, "user_id = ?", userID); err != nil {
@@ -140,7 +149,6 @@ func (s *OrderService) GetUserOrders(userID uuid.UUID) ([]models.Order, error) {
     return orders, nil
 }
 
-// GetOrderByID gets order by ID
 func (s *OrderService) GetOrderByID(orderID string) (*models.Order, error) {
     var order models.Order
     if err := s.repo.FindByID(&order, orderID); err != nil {
@@ -154,7 +162,6 @@ func (s *OrderService) GetOrderByID(orderID string) (*models.Order, error) {
     return &order, nil
 }
 
-// UpdateOrderStatus updates order status
 func (s *OrderService) UpdateOrderStatus(orderID string, status string) error {
     updates := map[string]interface{}{
         "order_status": status,
@@ -164,7 +171,6 @@ func (s *OrderService) UpdateOrderStatus(orderID string, status string) error {
     return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
 }
 
-// UpdatePaymentStatus updates payment status
 func (s *OrderService) UpdatePaymentStatus(orderID string, paymentStatus string, paymentID string) error {
     updates := map[string]interface{}{
         "payment_status":      paymentStatus,

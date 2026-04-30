@@ -128,6 +128,7 @@ func SetUpRoutes(
 		admin.DELETE("/users/:id", adminController.DeleteUser)
 		admin.GET("/stats/products", adminController.GetTotalProducts)
 		admin.GET("/orders", adminController.GetAllOrders)
+		admin.PUT("/orders/:id/status", adminController.UpdateOrderStatus)
 		admin.GET("/feedbacks", adminController.GetAllFeedbacks)
 		admin.PUT("/feedbacks/:id/approve", adminController.ApproveFeedback)
 		admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
