@@ -33,7 +33,11 @@ func NewPaymentService(repo repository.PgSQLRepository, cfg *config.Config) *Pay
 }
 
 // CreateOrder creates a Razorpay order
-func (s *PaymentService) CreateOrder(amount int64, currency string, receipt string) (map[string]interface{}, error) {
+func (s *PaymentService) CreateOrder(amount int64, currency string, receipt string, userID uuid.UUID) (map[string]interface{}, error) {
+    if amount <= 0 {
+        return nil, errors.New("invalid amount")
+    }
+    
     data := map[string]interface{}{
         "amount":          amount,
         "currency":        currency,
@@ -53,7 +57,9 @@ func (s *PaymentService) CreateOrder(amount int64, currency string, receipt stri
         Amount:          amount,
         Currency:        currency,
         Status:          "created",
+        UserID:          userID,
         CreatedAt:       time.Now(),
+        UpdatedAt:       time.Now(),
     }
     
     if err := s.repo.Insert(paymentOrder); err != nil {
@@ -63,19 +69,30 @@ func (s *PaymentService) CreateOrder(amount int64, currency string, receipt stri
     return order, nil
 }
 
-// VerifyPayment verifies the payment signature
-func (s *PaymentService) VerifyPayment(orderID, paymentID, signature string) (bool, error) {
+// VerifyPayment verifies payment signature and updates order
+func (s *PaymentService) VerifyPayment(orderID, paymentID, signature string, orderUUID uuid.UUID, userID uuid.UUID) (bool, error) {
+    // Start transaction
+    tx := s.repo.BeginTransaction()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+    
     var payment models.Payment
-    if err := s.repo.FindOneWhere(&payment, "razorpay_order_id = ?", orderID); err != nil {
+    if err := tx.FindOneWhere(&payment, "razorpay_order_id = ? AND user_id = ?", orderID, userID); err != nil {
+        tx.Rollback()
         return false, errors.New("payment order not found")
     }
     
     generatedSignature := s.generateSignature(orderID, paymentID)
     
     if generatedSignature != signature {
+        tx.Rollback()
         return false, errors.New("signature verification failed")
     }
     
+    // Update payment record
     updates := map[string]interface{}{
         "razorpay_payment_id": paymentID,
         "razorpay_signature":  signature,
@@ -83,8 +100,25 @@ func (s *PaymentService) VerifyPayment(orderID, paymentID, signature string) (bo
         "updated_at":          time.Now(),
     }
     
-    if err := s.repo.UpdateByFields(&models.Payment{}, payment.ID, updates); err != nil {
+    if err := tx.UpdateByFields(&models.Payment{}, payment.ID, updates); err != nil {
+        tx.Rollback()
         return false, fmt.Errorf("failed to update payment status: %w", err)
+    }
+    
+    // Update actual order payment status
+    orderUpdates := map[string]interface{}{
+        "payment_status":      "paid",
+        "razorpay_payment_id": paymentID,
+        "updated_at":          time.Now(),
+    }
+    
+    if err := tx.UpdateByFields(&models.Order{}, orderUUID, orderUpdates); err != nil {
+        tx.Rollback()
+        return false, fmt.Errorf("failed to update order payment status: %w", err)
+    }
+    
+    if err := tx.Commit(); err != nil {
+        return false, fmt.Errorf("failed to commit transaction: %w", err)
     }
     
     return true, nil
@@ -102,7 +136,7 @@ func (s *PaymentService) HandleWebhook(body []byte, signature string) error {
     secret := s.keySecret
     expectedSignature := s.generateWebhookSignature(body, secret)
     
-    if expectedSignature != signature {
+    if !hmac.Equal([]byte(expectedSignature), []byte(signature)) {
         return errors.New("invalid webhook signature")
     }
     
@@ -111,23 +145,61 @@ func (s *PaymentService) HandleWebhook(body []byte, signature string) error {
         return fmt.Errorf("failed to parse webhook: %w", err)
     }
     
-    event, _ := webhookData["event"].(string)
+    event, ok := webhookData["event"].(string)
+    if !ok {
+        return errors.New("invalid webhook event")
+    }
+    
     switch event {
     case "payment.captured":
-        payload := webhookData["payload"].(map[string]interface{})
-        payment := payload["payment"].(map[string]interface{})
-        orderID := payment["order_id"].(string)
-        paymentID := payment["id"].(string)
+        payload, ok := webhookData["payload"].(map[string]interface{})
+        if !ok {
+            return errors.New("invalid webhook payload")
+        }
+        
+        payment, ok := payload["payment"].(map[string]interface{})
+        if !ok {
+            return errors.New("invalid payment data")
+        }
+        
+        orderID, ok := payment["order_id"].(string)
+        if !ok {
+            return errors.New("invalid order ID")
+        }
+        
+        paymentID, ok := payment["id"].(string)
+        if !ok {
+            return errors.New("invalid payment ID")
+        }
+        
+        // Use transaction for webhook
+        tx := s.repo.BeginTransaction()
+        defer func() {
+            if r := recover(); r != nil {
+                tx.Rollback()
+            }
+        }()
         
         var paymentRecord models.Payment
-        if err := s.repo.FindOneWhere(&paymentRecord, "razorpay_order_id = ?", orderID); err == nil {
+        if err := tx.FindOneWhere(&paymentRecord, "razorpay_order_id = ?", orderID); err == nil {
             updates := map[string]interface{}{
                 "razorpay_payment_id": paymentID,
                 "status":              "paid",
                 "updated_at":          time.Now(),
             }
-            s.repo.UpdateByFields(&models.Payment{}, paymentRecord.ID, updates)
+            tx.UpdateByFields(&models.Payment{}, paymentRecord.ID, updates)
+            
+            // Update order if linked
+            if paymentRecord.OrderID != "" {
+                orderUpdates := map[string]interface{}{
+                    "payment_status": "paid",
+                    "updated_at":     time.Now(),
+                }
+                tx.UpdateByFields(&models.Order{}, paymentRecord.OrderID, orderUpdates)
+            }
         }
+        
+        tx.Commit()
     }
     
     return nil
@@ -148,9 +220,12 @@ func (s *PaymentService) FetchPayment(paymentID string) (map[string]interface{},
     return payment, nil
 }
 
-// RefundPayment initiates a refund - FIXED VERSION
+// RefundPayment initiates a refund
 func (s *PaymentService) RefundPayment(paymentID string, amount int64) (map[string]interface{}, error) {
-    // Razorpay refund expects: (paymentID string, amount int, data map[string]interface{}, query map[string]string)
+    if amount <= 0 {
+        return nil, errors.New("invalid refund amount")
+    }
+    
     refund, err := s.client.Payment.Refund(paymentID, int(amount), nil, nil)
     if err != nil {
         return nil, fmt.Errorf("failed to refund payment: %w", err)

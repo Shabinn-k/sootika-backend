@@ -40,12 +40,26 @@ func (c *OrderController) CreateOrder(ctx *gin.Context) {
         return
     }
     
-    userUUID, _ := uuid.Parse(userID.(string))
-    addressUUID, _ := uuid.Parse(req.AddressID)
+    // ⚠️ FIX: Validate UUID parsing
+    userUUID, err := uuid.Parse(userID.(string))
+    if err != nil {
+        ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+        return
+    }
+    
+    addressUUID, err := uuid.Parse(req.AddressID)
+    if err != nil {
+        ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid address ID"})
+        return
+    }
     
     var items []services.OrderItemInput
     for _, item := range req.Items {
-        productUUID, _ := uuid.Parse(item.ProductID)
+        productUUID, err := uuid.Parse(item.ProductID)
+        if err != nil {
+            ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid product ID: " + item.ProductID})
+            return
+        }
         items = append(items, services.OrderItemInput{
             ProductID: productUUID,
             Quantity:  item.Quantity,
@@ -72,7 +86,12 @@ func (c *OrderController) GetMyOrders(ctx *gin.Context) {
         return
     }
     
-    userUUID, _ := uuid.Parse(userID.(string))
+    userUUID, err := uuid.Parse(userID.(string))
+    if err != nil {
+        ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+        return
+    }
+    
     orders, err := c.orderService.GetUserOrders(userUUID)
     if err != nil {
         ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
@@ -85,8 +104,14 @@ func (c *OrderController) GetMyOrders(ctx *gin.Context) {
     })
 }
 
-// GetOrderByID - GET /api/orders/:id
+// ⚠️ CRITICAL FIX: Add ownership check
 func (c *OrderController) GetOrderByID(ctx *gin.Context) {
+    userID, exists := ctx.Get("user_id")
+    if !exists {
+        ctx.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
+        return
+    }
+    
     orderID := ctx.Param("id")
     order, err := c.orderService.GetOrderByID(orderID)
     if err != nil {
@@ -94,12 +119,50 @@ func (c *OrderController) GetOrderByID(ctx *gin.Context) {
         return
     }
     
+    // ⚠️ FIX: Verify order belongs to user
+    userUUID, _ := uuid.Parse(userID.(string))
+    if order.UserID != userUUID {
+        ctx.JSON(constant.FORBIDDEN, gin.H{"error": "Access denied: order does not belong to you"})
+        return
+    }
+    
     ctx.JSON(constant.SUCCESS, order)
 }
 
-// CancelOrder - PUT /api/orders/:id/cancel
+// ⚠️ CRITICAL FIX: Add ownership check
 func (c *OrderController) CancelOrder(ctx *gin.Context) {
+    userID, exists := ctx.Get("user_id")
+    if !exists {
+        ctx.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
+        return
+    }
+    
     orderID := ctx.Param("id")
+    
+    // ⚠️ FIX: Get order first to check ownership
+    order, err := c.orderService.GetOrderByID(orderID)
+    if err != nil {
+        ctx.JSON(constant.NOTFOUND, gin.H{"error": "Order not found"})
+        return
+    }
+    
+    // Verify order belongs to user
+    userUUID, _ := uuid.Parse(userID.(string))
+    if order.UserID != userUUID {
+        ctx.JSON(constant.FORBIDDEN, gin.H{"error": "Access denied: cannot cancel another user's order"})
+        return
+    }
+    
+    // Check if order can be cancelled
+    if order.OrderStatus == "cancelled" {
+        ctx.JSON(constant.BADREQUEST, gin.H{"error": "Order already cancelled"})
+        return
+    }
+    
+    if order.OrderStatus == "delivered" {
+        ctx.JSON(constant.BADREQUEST, gin.H{"error": "Cannot cancel delivered order"})
+        return
+    }
     
     if err := c.orderService.UpdateOrderStatus(orderID, "cancelled"); err != nil {
         ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})

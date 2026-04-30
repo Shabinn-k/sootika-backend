@@ -23,29 +23,48 @@ func NewAdminController(
 	}
 }
 
+// ⚠️ CRITICAL FIX 1: Check admin role
 func (a *AdminController) Dashboard(c *gin.Context) {
+	role, exists := c.Get("role")
+	if !exists || role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	userID, _ := c.Get("user_id")
-	role, _ := c.Get("role")
 
 	var totalProducts int64
 	var totalUsers int64
 	var pendingFeedback int64
 	var recentUsers []models.User
+	var totalOrders int64
+	var pendingOrders int64
+	var totalRevenue int64
 
-	a.repo.Count(&models.Product{}, &totalProducts)
-	a.repo.Count(&models.User{}, &totalUsers)
-	a.repo.GetDB().Model(&models.Feedback{}).Where("feed = ?", "pending").Count(&pendingFeedback)
-
-	var allUsers []models.User
-	a.repo.FindAll(&allUsers)
-
-	startIdx := len(allUsers) - 5
-	if startIdx < 0 {
-		startIdx = 0
+	// ⚠️ FIX: Handle count errors
+	if err := a.repo.Count(&models.Product{}, &totalProducts); err != nil {
+		totalProducts = 0
 	}
-	for i := startIdx; i < len(allUsers); i++ {
-		allUsers[i].Password = ""
-		recentUsers = append([]models.User{allUsers[i]}, recentUsers...)
+	if err := a.repo.Count(&models.User{}, &totalUsers); err != nil {
+		totalUsers = 0
+	}
+	
+	// Get pending feedback count
+	if err := a.repo.GetDB().Model(&models.Feedback{}).Where("feed = ?", "pending").Count(&pendingFeedback).Error; err != nil {
+		pendingFeedback = 0
+	}
+	
+	// Get order stats
+	a.repo.GetDB().Model(&models.Order{}).Count(&totalOrders)
+	a.repo.GetDB().Model(&models.Order{}).Where("track = ? OR order_status = ?", "Pending", "pending").Count(&pendingOrders)
+	a.repo.GetDB().Model(&models.Order{}).Where("track = ? OR order_status = ?", "Delivered", "delivered").Select("COALESCE(SUM(total), 0)").Scan(&totalRevenue)
+
+	// Get recent 5 users
+	a.repo.GetDB().Order("created_at desc").Limit(5).Find(&recentUsers)
+	
+	// Remove passwords from response
+	for i := range recentUsers {
+		recentUsers[i].Password = ""
 	}
 
 	c.JSON(constant.SUCCESS, gin.H{
@@ -56,13 +75,22 @@ func (a *AdminController) Dashboard(c *gin.Context) {
 			"total_products":   totalProducts,
 			"total_users":      totalUsers,
 			"pending_feedback": pendingFeedback,
-			"total_revenue":    150000,
+			"total_revenue":    totalRevenue,
 			"recent_users":     recentUsers,
+			"total_orders":     totalOrders,
+			"pending_orders":   pendingOrders,
 		},
 	})
 }
 
+// ⚠️ CRITICAL FIX 2: Add role check to all methods
 func (a *AdminController) GetAllUsers(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	var users []models.User
 	if err := a.repo.FindAll(&users); err != nil {
 		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
@@ -78,6 +106,12 @@ func (a *AdminController) GetAllUsers(c *gin.Context) {
 }
 
 func (a *AdminController) GetUserByID(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
@@ -93,6 +127,12 @@ func (a *AdminController) GetUserByID(c *gin.Context) {
 }
 
 func (a *AdminController) UpdateUserRole(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
@@ -119,6 +159,12 @@ func (a *AdminController) UpdateUserRole(c *gin.Context) {
 }
 
 func (a *AdminController) ToggleBlockUser(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
@@ -153,6 +199,12 @@ func (a *AdminController) ToggleBlockUser(c *gin.Context) {
 }
 
 func (a *AdminController) DeleteUser(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "User ID is required"})
@@ -176,18 +228,36 @@ func (a *AdminController) DeleteUser(c *gin.Context) {
 }
 
 func (a *AdminController) GetTotalProducts(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	var count int64
 	a.repo.Count(&models.Product{}, &count)
 	c.JSON(constant.SUCCESS, gin.H{"total_products": count})
 }
 
 func (a *AdminController) GetTotalUsers(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	var count int64
 	a.repo.Count(&models.User{}, &count)
 	c.JSON(constant.SUCCESS, gin.H{"total_users": count})
 }
 
 func (a *AdminController) GetAllFeedbacks(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	var feedbacks []models.Feedback
 	if err := a.repo.FindAll(&feedbacks); err != nil {
 		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to fetch feedbacks"})
@@ -197,6 +267,12 @@ func (a *AdminController) GetAllFeedbacks(c *gin.Context) {
 }
 
 func (a *AdminController) ApproveFeedback(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	feedbackID := c.Param("id")
 	if feedbackID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Feedback ID is required"})
@@ -213,6 +289,12 @@ func (a *AdminController) ApproveFeedback(c *gin.Context) {
 }
 
 func (a *AdminController) DeleteFeedback(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	feedbackID := c.Param("id")
 	if feedbackID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Feedback ID is required"})
@@ -228,4 +310,37 @@ func (a *AdminController) DeleteFeedback(c *gin.Context) {
 		return
 	}
 	c.JSON(constant.SUCCESS, gin.H{"message": "Feedback deleted successfully"})
+}
+
+// ⚠️ CRITICAL FIX 3: Fixed GetAllOrders with proper preload
+func (a *AdminController) GetAllOrders(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
+	var orders []models.Order
+	
+	// Load items and user data
+	if err := a.repo.GetDB().
+		Preload("Items").
+		Find(&orders).Error; err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Load user for each order separately
+	for i := range orders {
+		var user models.User
+		if err := a.repo.FindByID(&user, orders[i].UserID); err == nil {
+			user.Password = ""
+			orders[i].User = user
+		}
+	}
+	
+	c.JSON(constant.SUCCESS, gin.H{
+		"data":  orders,
+		"count": len(orders),
+	})
 }

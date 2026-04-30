@@ -43,6 +43,7 @@ func main() {
     cartService := services.NewCartService(repo)
     paymentService := services.NewPaymentService(repo, cfg)
     orderService := services.NewOrderService(repo)
+    addressService := services.NewAddressService(repo) // ⚠️ CREATE THIS
 
     authController := controllers.NewAuthController(authService)
     productController := controllers.NewProductController(productService)
@@ -50,7 +51,7 @@ func main() {
     cartController := controllers.NewCartController(cartService)
     paymentController := controllers.NewPaymentController(paymentService)
     orderController := controllers.NewOrderController(orderService)
-    addressController := controllers.NewAddressController(repo)  // Pass repo directly
+    addressController := controllers.NewAddressController(addressService) // ⚠️ PASS SERVICE
     adminController := controllers.NewAdminController(productService, repo)
 
     r := gin.Default()
@@ -63,7 +64,7 @@ func main() {
         wishlistController,
         cartController,
         paymentController,
-        addressController,  // Now this matches the expected type
+        addressController,
         orderController,
         adminController,
         repo,

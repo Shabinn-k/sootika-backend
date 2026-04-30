@@ -111,10 +111,16 @@ func (s *CartService) UpdateCartItemQuantity(userID, cartItemID string, quantity
 		"quantity": quantity,
 	})
 }
-
 func (s *CartService) RemoveFromCart(userID, cartItemID string) error {
-	userUUID, _ := uuid.Parse(userID)
-	itemUUID, _ := uuid.Parse(cartItemID)
+	// ⚠️ FIX: Don't ignore errors
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
+	itemUUID, err := uuid.Parse(cartItemID)
+	if err != nil {
+		return fmt.Errorf("invalid cart item ID: %w", err)
+	}
 
 	var cart models.Cart
 	if err := s.Repo.FindOneWhere(&cart, "user_id = ?", userUUID); err != nil {
@@ -125,7 +131,6 @@ func (s *CartService) RemoveFromCart(userID, cartItemID string) error {
 		Where("id = ? AND cart_id = ?", itemUUID, cart.ID).
 		Delete(&models.CartItem{}).Error
 }
-
 func (s *CartService) loadCartItems(cart *models.Cart) error {
 	var items []models.CartItem
 
@@ -158,9 +163,12 @@ func (s *CartService) GetCart(userID string) (*models.Cart, error) {
 
 	return cart, nil
 }
-
 func (s *CartService) GetCartCount(userID string) (int, error) {
-	userUUID, _ := uuid.Parse(userID)
+	// ⚠️ FIX: Handle error
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return 0, fmt.Errorf("invalid user ID: %w", err)
+	}
 
 	var cart models.Cart
 	if err := s.Repo.FindOneWhere(&cart, "user_id = ?", userUUID); err != nil {
@@ -189,9 +197,12 @@ func (s *CartService) GetCartTotal(userID string) (int64, error) {
 
 	return total, nil
 }
-
 func (s *CartService) ClearCart(userID string) error {
-	userUUID, _ := uuid.Parse(userID)
+	// ⚠️ FIX: Handle error
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID: %w", err)
+	}
 
 	var cart models.Cart
 	if err := s.Repo.FindOneWhere(&cart, "user_id = ?", userUUID); err != nil {

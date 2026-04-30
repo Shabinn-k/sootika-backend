@@ -18,7 +18,14 @@ func NewProductController(service *services.ProductService) *ProductController {
 	}
 }
 
+// ⚠️ CRITICAL FIX: Admin only
 func (p *ProductController) CreateProduct(c *gin.Context) {
+	role, exists := c.Get("role")
+	if !exists || role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Failed to parse multipart form"})
 		return
@@ -93,6 +100,7 @@ func (p *ProductController) CreateProduct(c *gin.Context) {
 	})
 }
 
+// Public endpoint - but verify auth optional
 func (p *ProductController) GetProductByID(c *gin.Context) {
 	productID := c.Param("id")
 	if productID == "" {
@@ -107,6 +115,7 @@ func (p *ProductController) GetProductByID(c *gin.Context) {
 	c.JSON(constant.SUCCESS, product)
 }
 
+// Public endpoint
 func (p *ProductController) GetAllProducts(c *gin.Context) {
 	products, err := p.Service.GetAllProducts()
 	if err != nil {
@@ -119,7 +128,14 @@ func (p *ProductController) GetAllProducts(c *gin.Context) {
 	})
 }
 
+// ⚠️ CRITICAL FIX: Admin only
 func (p *ProductController) UpdateProduct(c *gin.Context) {
+	role, exists := c.Get("role")
+	if !exists || role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	productID := c.Param("id")
 	if productID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Product ID is required"})
@@ -157,7 +173,14 @@ func (p *ProductController) UpdateProduct(c *gin.Context) {
 	c.JSON(constant.SUCCESS, product)
 }
 
+// ⚠️ CRITICAL FIX: Admin only
 func (p *ProductController) UpdateProductImage(c *gin.Context) {
+	role, exists := c.Get("role")
+	if !exists || role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	productID := c.Param("id")
 	imageType := c.Param("type")
 
@@ -187,7 +210,14 @@ func (p *ProductController) UpdateProductImage(c *gin.Context) {
 	})
 }
 
+// ⚠️ CRITICAL FIX: Admin only
 func (p *ProductController) DeleteProduct(c *gin.Context) {
+	role, exists := c.Get("role")
+	if !exists || role != "admin" {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
+		return
+	}
+	
 	productID := c.Param("id")
 	if productID == "" {
 		c.JSON(constant.BADREQUEST, gin.H{"error": "Product ID is required"})
@@ -202,6 +232,7 @@ func (p *ProductController) DeleteProduct(c *gin.Context) {
 	c.JSON(constant.SUCCESS, gin.H{"message": "Product deleted successfully"})
 }
 
+// Public endpoint
 func (p *ProductController) GetInStockProducts(c *gin.Context) {
 	products, err := p.Service.GetInStockProducts()
 	if err != nil {
@@ -215,6 +246,7 @@ func (p *ProductController) GetInStockProducts(c *gin.Context) {
 	})
 }
 
+// Public endpoint
 func (p *ProductController) SearchProducts(c *gin.Context) {
 	term := c.Query("q")
 	if term == "" {
@@ -231,4 +263,29 @@ func (p *ProductController) SearchProducts(c *gin.Context) {
 		"data":  products,
 		"count": len(products),
 	})
+}
+func (p *ProductController) UpdateProductStock(c *gin.Context) {
+	// Only service-to-service call or admin
+	role, exists := c.Get("role")
+	if !exists || (role != "admin" && role != "service") {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Unauthorized"})
+		return
+	}
+	
+	productID := c.Param("id")
+	var req struct {
+		Quantity int `json:"quantity" binding:"required,min=1"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(constant.BADREQUEST, gin.H{"error": err.Error()})
+		return
+	}
+	
+	if err := p.Service.UpdateProductStock(productID, req.Quantity); err != nil {
+		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(constant.SUCCESS, gin.H{"message": "Stock updated successfully"})
 }

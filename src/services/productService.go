@@ -219,22 +219,47 @@ func (s *ProductService) DeleteProduct(productID string) error {
 	if err != nil {
 		return fmt.Errorf("invalid product id: %w", err)
 	}
+	
 	var product models.Product
 	if err := s.Repo.FindByID(&product, productUUID); err != nil {
 		return fmt.Errorf("product not found: %w", err)
 	}
-	if product.MainImagePublicID != "" {
-		uploads.DeleteImage(product.MainImagePublicID)
-	}
-	if product.SecondImagePublicID != "" {
-		uploads.DeleteImage(product.SecondImagePublicID)
-	}
-	if product.ThirdImagePublicID != "" {
-		uploads.DeleteImage(product.ThirdImagePublicID)
-	}
-	if err := s.Repo.Delete(&product, productUUID); err != nil {
+	
+	// Use transaction to ensure both image deletion and product deletion succeed or fail together
+	tx := s.Repo.BeginTransaction()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	
+	// Delete images (store public IDs before deletion)
+	mainPublicID := product.MainImagePublicID
+	secondPublicID := product.SecondImagePublicID
+	thirdPublicID := product.ThirdImagePublicID
+	
+	// Delete product from database first
+	if err := tx.Delete(&product, productUUID); err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
+	
+	// Commit transaction before deleting images (images can be deleted async)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit product deletion: %w", err)
+	}
+	
+	// Delete images after successful DB deletion (best effort)
+	if mainPublicID != "" {
+		uploads.DeleteImage(mainPublicID)
+	}
+	if secondPublicID != "" {
+		uploads.DeleteImage(secondPublicID)
+	}
+	if thirdPublicID != "" {
+		uploads.DeleteImage(thirdPublicID)
+	}
+	
 	return nil
 }
 

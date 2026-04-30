@@ -1,3 +1,4 @@
+// routes.go - FIXED payment routes
 package routes
 
 import (
@@ -17,27 +18,26 @@ func SetUpRoutes(
 	productController *controllers.ProductController,
 	wishlistController *controllers.WishlistController,
 	cartController *controllers.CartController,
-	 paymentController *controllers.PaymentController,
-	 addressController *controllers.AddressController,
-    orderController *controllers.OrderController,
-	 adminController *controllers.AdminController,
+	paymentController *controllers.PaymentController,
+	addressController *controllers.AddressController,
+	orderController *controllers.OrderController,
+	adminController *controllers.AdminController,
 	repo *repository.Repository,
 ) {
 	r.Use(cors.New(cors.Config{
-		AllowOriginFunc: func(origin string) bool {
-			return true
-		},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		AllowOriginFunc:   func(origin string) bool { return true },
+		AllowMethods:      []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:      []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:     []string{"Content-Length"},
+		AllowCredentials:  true,
+		MaxAge:            12 * time.Hour,
 	}))
+
 	r.GET("/api/test", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "backend connected",
-		})
+		c.JSON(200, gin.H{"message": "backend connected"})
 	})
+
+	// Auth routes
 	auth := r.Group("/auth")
 	{
 		auth.POST("/signup", authController.Signup)
@@ -48,10 +48,12 @@ func SetUpRoutes(
 		auth.POST("/logout", authController.Logout)
 	}
 
+	// User routes
 	user := r.Group("/user")
 	user.Use(middleware.AuthMiddleware(jwtManager))
 	user.GET("/dashboard", authController.Dashboard)
 
+	// Product routes (public)
 	products := r.Group("/products")
 	{
 		products.GET("/", productController.GetAllProducts)
@@ -60,6 +62,7 @@ func SetUpRoutes(
 		products.GET("/in-stock", productController.GetInStockProducts)
 	}
 
+	// Wishlist routes
 	wishlist := r.Group("/wishlist")
 	wishlist.Use(middleware.AuthMiddleware(jwtManager))
 	{
@@ -71,6 +74,7 @@ func SetUpRoutes(
 		wishlist.DELETE("/clear", wishlistController.ClearWishlist)
 	}
 
+	// Cart routes
 	cart := r.Group("/cart")
 	cart.Use(middleware.AuthMiddleware(jwtManager))
 	{
@@ -82,29 +86,36 @@ func SetUpRoutes(
 		cart.DELETE("/remove/:item_id", cartController.RemoveFromCart)
 		cart.DELETE("/clear", cartController.ClearCart)
 	}
-	 payment := r.Group("/api/payment")
-    {
-        payment.POST("/create-order", paymentController.CreateOrder)
-        payment.POST("/verify", paymentController.VerifyPayment)
-        payment.POST("/webhook", paymentController.Webhook)
-    }
-  addresses := r.Group("/api/addresses")
-    addresses.Use(middleware.AuthMiddleware(jwtManager))
-    {
-        addresses.GET("/", addressController.GetMyAddresses)
-        addresses.POST("/", addressController.AddAddress)
-        addresses.PUT("/:id", addressController.UpdateAddress)
-        addresses.DELETE("/:id", addressController.DeleteAddress)
-    }
-	  orders := r.Group("/api/orders")
-    orders.Use(middleware.AuthMiddleware(jwtManager))
-    {
-        orders.POST("/", orderController.CreateOrder)
-        orders.GET("/", orderController.GetMyOrders)
-        orders.GET("/:id", orderController.GetOrderByID)
-        orders.PUT("/:id/cancel", orderController.CancelOrder)
-    }
-	
+
+	// ⚠️ FIXED: Payment routes - protected except webhook
+	payment := r.Group("/payment") // Changed from /api/payment
+	{
+		payment.POST("/create-order", middleware.AuthMiddleware(jwtManager), paymentController.CreateOrder)
+		payment.POST("/verify", middleware.AuthMiddleware(jwtManager), paymentController.VerifyPayment)
+		payment.POST("/webhook", paymentController.Webhook) // NO auth for webhook
+	}
+
+	// Address routes
+	addresses := r.Group("/addresses")
+	addresses.Use(middleware.AuthMiddleware(jwtManager))
+	{
+		addresses.GET("/", addressController.GetMyAddresses)
+		addresses.POST("/", addressController.AddAddress)
+		addresses.PUT("/:id", addressController.UpdateAddress)
+		addresses.DELETE("/:id", addressController.DeleteAddress)
+	}
+
+	// Order routes
+	orders := r.Group("/orders")
+	orders.Use(middleware.AuthMiddleware(jwtManager))
+	{
+		orders.POST("/", orderController.CreateOrder)
+		orders.GET("/", orderController.GetMyOrders)
+		orders.GET("/:id", orderController.GetOrderByID)
+		orders.PUT("/:id/cancel", orderController.CancelOrder)
+	}
+
+	// Admin routes
 	admin := r.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(jwtManager))
 	admin.Use(middleware.AdminMiddleware(repo))
@@ -116,11 +127,10 @@ func SetUpRoutes(
 		admin.PUT("/users/:id/toggle-block", adminController.ToggleBlockUser)
 		admin.DELETE("/users/:id", adminController.DeleteUser)
 		admin.GET("/stats/products", adminController.GetTotalProducts)
-
+		admin.GET("/orders", adminController.GetAllOrders)
 		admin.GET("/feedbacks", adminController.GetAllFeedbacks)
 		admin.PUT("/feedbacks/:id/approve", adminController.ApproveFeedback)
 		admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
-
 		admin.POST("/products", productController.CreateProduct)
 		admin.PUT("/products/:id", productController.UpdateProduct)
 		admin.PUT("/products/:id/image/:type", productController.UpdateProductImage)

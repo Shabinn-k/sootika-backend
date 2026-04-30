@@ -30,14 +30,14 @@ func (s *CartController) GetCart(c *gin.Context) {
 	c.JSON(constant.SUCCESS, gin.H{
 		"message": "Cart fetched successfully",
 		"cart":    cart,
-		"Items":   len(cart.Items),
+		"items":   len(cart.Items),
 	})
 }
 
 func (s *CartController) AddToCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User is not authenticated"})
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
 		return
 	}
 	var req struct {
@@ -82,10 +82,11 @@ func (s *CartController) UpdateCartItemQuantity(c *gin.Context) {
 	}
 	c.JSON(constant.SUCCESS, gin.H{"message": "Cart item quantity updated successfully"})
 }
+
 func (s *CartController) RemoveFromCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User is not authenticated"})
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
 		return
 	}
 	cartItemID := c.Param("item_id")
@@ -103,7 +104,7 @@ func (s *CartController) RemoveFromCart(c *gin.Context) {
 func (s *CartController) GetCartCount(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User is not authenticated"})
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
 		return
 	}
 	count, err := s.Services.GetCartCount(userID.(string))
@@ -117,7 +118,7 @@ func (s *CartController) GetCartCount(c *gin.Context) {
 func (s *CartController) GetCartTotal(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User is not authenticated"})
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
 		return
 	}
 	total, err := s.Services.GetCartTotal(userID.(string))

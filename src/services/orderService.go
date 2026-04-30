@@ -16,11 +16,13 @@ type OrderService struct {
 func NewOrderService(repo repository.PgSQLRepository) *OrderService {
     return &OrderService{repo: repo}
 }
+
 type OrderItemInput struct {
     ProductID uuid.UUID
     Quantity  int
 }
-// CreateOrder creates a new order
+
+// ⚠️ CRITICAL FIX: CreateOrder with transaction using repository methods
 func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, addressID uuid.UUID, paymentMethod string) (*models.Order, error) {
     var user models.User
     if err := s.repo.FindByID(&user, userID); err != nil {
@@ -32,6 +34,10 @@ func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, add
         return nil, fmt.Errorf("address not found")
     }
     
+    if address.UserID != userID {
+        return nil, fmt.Errorf("address does not belong to user")
+    }
+    
     var subtotal int64
     var orderItems []models.OrderItem
     
@@ -39,6 +45,10 @@ func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, add
         var product models.Product
         if err := s.repo.FindByID(&product, item.ProductID); err != nil {
             return nil, fmt.Errorf("product not found: %v", item.ProductID)
+        }
+        
+        if product.Stock < item.Quantity {
+            return nil, fmt.Errorf("insufficient stock for product: %s", product.Name)
         }
         
         total := product.Price * int64(item.Quantity)
@@ -60,33 +70,54 @@ func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, add
     discount := int64(0)
     total := subtotal + shippingCost + tax - discount
     
-    orderNumber := fmt.Sprintf("SOO%d%d", time.Now().UnixNano(), userID[:8])
-    orderNumber = orderNumber[:20]
-    
+orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8])    
     order := &models.Order{
-        OrderNumber:    orderNumber,
-        UserID:         userID,
-        Total:          total,
-        Subtotal:       subtotal,
-        ShippingCost:   shippingCost,
-        Tax:            tax,
-        Discount:       discount,
-        PaymentMethod:  paymentMethod,
-        PaymentStatus:  "pending",
-        OrderStatus:    "pending",
-        Track:          "Pending",
+        OrderNumber:     orderNumber,
+        UserID:          userID,
+        Total:           total,
+        Subtotal:        subtotal,
+        ShippingCost:    shippingCost,
+        Tax:             tax,
+        Discount:        discount,
+        PaymentMethod:   paymentMethod,
+        PaymentStatus:   "pending",
+        OrderStatus:     "pending",
+        Track:           "Pending",
         ShippingAddress: address,
     }
     
-    if err := s.repo.Insert(order); err != nil {
+    // ⚠️ FIX: Use repository transaction methods directly
+    tx := s.repo.BeginTransaction()
+    defer func() {
+        if r := recover(); r != nil {
+            tx.Rollback()
+        }
+    }()
+    
+    if err := tx.Insert(order); err != nil {
+        tx.Rollback()
         return nil, fmt.Errorf("failed to create order: %w", err)
     }
     
     for i := range orderItems {
         orderItems[i].OrderID = order.ID
-        if err := s.repo.Insert(&orderItems[i]); err != nil {
+        if err := tx.Insert(&orderItems[i]); err != nil {
+            tx.Rollback()
             return nil, fmt.Errorf("failed to create order items: %w", err)
         }
+        
+        // Reduce product stock
+        var product models.Product
+        if err := tx.FindByID(&product, orderItems[i].ProductID); err == nil {
+            stockUpdates := map[string]interface{}{
+                "stock": product.Stock - orderItems[i].Quantity,
+            }
+            tx.UpdateByFields(&models.Product{}, product.ID, stockUpdates)
+        }
+    }
+    
+    if err := tx.Commit(); err != nil {
+        return nil, fmt.Errorf("failed to commit order: %w", err)
     }
     
     order.Items = orderItems
