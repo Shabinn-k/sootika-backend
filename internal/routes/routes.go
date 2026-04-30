@@ -1,28 +1,31 @@
 package routes
 
 import (
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"golang/middleware"
 	"golang/src/controllers"
 	"golang/src/repository"
 	"golang/utils/jwt"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"time"
 )
 
 func SetUpRoutes(
-    r *gin.Engine,
-    authController *controllers.AuthController,
-    jwtManager *jwt.Manager,
-    productController *controllers.ProductController,
-    wishlistController *controllers.WishlistController,
-    cartController *controllers.CartController,
-    adminController *controllers.AdminController,
-    repo *repository.Repository,
-)  {
+	r *gin.Engine,
+	authController *controllers.AuthController,
+	jwtManager *jwt.Manager,
+	productController *controllers.ProductController,
+	wishlistController *controllers.WishlistController,
+	cartController *controllers.CartController,
+	 paymentController *controllers.PaymentController,
+	 addressController *controllers.AddressController,
+    orderController *controllers.OrderController,
+	 adminController *controllers.AdminController,
+	repo *repository.Repository,
+) {
 	r.Use(cors.New(cors.Config{
 		AllowOriginFunc: func(origin string) bool {
-			return true // Allow all origins for development
+			return true
 		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
@@ -31,15 +34,15 @@ func SetUpRoutes(
 		MaxAge:           12 * time.Hour,
 	}))
 	r.GET("/api/test", func(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "backend connected",
+		c.JSON(200, gin.H{
+			"message": "backend connected",
+		})
 	})
-})
 	auth := r.Group("/auth")
 	{
 		auth.POST("/signup", authController.Signup)
 		auth.POST("/check", authController.VerifyOTP)
-		auth.POST("/resend-otp", authController.ResendOTP) 
+		auth.POST("/resend-otp", authController.ResendOTP)
 		auth.POST("/login", authController.Login)
 		auth.POST("/refresh", authController.Refresh)
 		auth.POST("/logout", authController.Logout)
@@ -79,30 +82,48 @@ func SetUpRoutes(
 		cart.DELETE("/remove/:item_id", cartController.RemoveFromCart)
 		cart.DELETE("/clear", cartController.ClearCart)
 	}
-
+	 payment := r.Group("/api/payment")
+    {
+        payment.POST("/create-order", paymentController.CreateOrder)
+        payment.POST("/verify", paymentController.VerifyPayment)
+        payment.POST("/webhook", paymentController.Webhook)
+    }
+  addresses := r.Group("/api/addresses")
+    addresses.Use(middleware.AuthMiddleware(jwtManager))
+    {
+        addresses.GET("/", addressController.GetMyAddresses)
+        addresses.POST("/", addressController.AddAddress)
+        addresses.PUT("/:id", addressController.UpdateAddress)
+        addresses.DELETE("/:id", addressController.DeleteAddress)
+    }
+	  orders := r.Group("/api/orders")
+    orders.Use(middleware.AuthMiddleware(jwtManager))
+    {
+        orders.POST("/", orderController.CreateOrder)
+        orders.GET("/", orderController.GetMyOrders)
+        orders.GET("/:id", orderController.GetOrderByID)
+        orders.PUT("/:id/cancel", orderController.CancelOrder)
+    }
+	
 	admin := r.Group("/admin")
-admin.Use(middleware.AuthMiddleware(jwtManager))
-admin.Use(middleware.AdminMiddleware(repo))
-{
-    admin.GET("/dashboard", adminController.Dashboard)
-    admin.GET("/users", adminController.GetAllUsers)
-    admin.GET("/users/:id", adminController.GetUserByID)
-    admin.PUT("/users/:id/role", adminController.UpdateUserRole)
-    admin.PUT("/users/:id/toggle-block", adminController.ToggleBlockUser)
-    admin.DELETE("/users/:id", adminController.DeleteUser)
-    admin.GET("/stats/products", adminController.GetTotalProducts)
+	admin.Use(middleware.AuthMiddleware(jwtManager))
+	admin.Use(middleware.AdminMiddleware(repo))
+	{
+		admin.GET("/dashboard", adminController.Dashboard)
+		admin.GET("/users", adminController.GetAllUsers)
+		admin.GET("/users/:id", adminController.GetUserByID)
+		admin.PUT("/users/:id/role", adminController.UpdateUserRole)
+		admin.PUT("/users/:id/toggle-block", adminController.ToggleBlockUser)
+		admin.DELETE("/users/:id", adminController.DeleteUser)
+		admin.GET("/stats/products", adminController.GetTotalProducts)
 
-    admin.GET("/feedbacks", adminController.GetAllFeedbacks)
-    admin.PUT("/feedbacks/:id/approve", adminController.ApproveFeedback)
-    admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
+		admin.GET("/feedbacks", adminController.GetAllFeedbacks)
+		admin.PUT("/feedbacks/:id/approve", adminController.ApproveFeedback)
+		admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
 
-
-    admin.POST("/products", productController.CreateProduct)
-    admin.PUT("/products/:id", productController.UpdateProduct)
-    admin.PUT("/products/:id/image/:type", productController.UpdateProductImage)
-    admin.DELETE("/products/:id", productController.DeleteProduct)
-}
-admin.GET("/test", func(c *gin.Context) {
-    c.JSON(200, gin.H{"message": "Admin endpoint working"})
-})
+		admin.POST("/products", productController.CreateProduct)
+		admin.PUT("/products/:id", productController.UpdateProduct)
+		admin.PUT("/products/:id/image/:type", productController.UpdateProductImage)
+		admin.DELETE("/products/:id", productController.DeleteProduct)
+	}
 }

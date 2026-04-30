@@ -18,12 +18,10 @@ type CloudinaryResult struct {
 }
 
 func UploadImageFile(file multipart.File, filename string) (*CloudinaryResult, error) {
-	// Get credentials from environment
 	cloudName := os.Getenv("CLOUD_NAME")
 	apiKey := os.Getenv("API_KEY")
 	apiSecret := os.Getenv("API_SECRET")
 	
-	// Debug output
 	fmt.Println("=== Cloudinary Debug ===")
 	fmt.Println("Cloud Name:", cloudName)
 	fmt.Println("API Key:", apiKey)
@@ -39,13 +37,11 @@ func UploadImageFile(file multipart.File, filename string) (*CloudinaryResult, e
 		return nil, fmt.Errorf("API_SECRET environment variable is not set")
 	}
 	
-	// Create Cloudinary instance
 	cld, err := cloudinary.NewFromParams(cloudName, apiKey, apiSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Cloudinary client: %v", err)
 	}
 	
-	// Generate public ID
 	publicID := strings.TrimSuffix(filename, ".jpg")
 	publicID = strings.TrimSuffix(publicID, ".png")
 	publicID = strings.TrimSuffix(publicID, ".jpeg")
@@ -62,7 +58,6 @@ func UploadImageFile(file multipart.File, filename string) (*CloudinaryResult, e
 	fmt.Println("Uploading to folder:", folder)
 	fmt.Println("Public ID:", publicID)
 	
-	// Upload to Cloudinary
 	ctx := context.Background()
 	resp, err := cld.Upload.Upload(ctx, file, uploader.UploadParams{
 		PublicID: publicID,

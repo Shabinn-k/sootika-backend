@@ -19,6 +19,9 @@ type User struct {
 	IsBlocked  bool   `gorm:"default:false" json:"is_blocked"`
 	IsVerified bool   `gorm:"default:false" json:"is_verified"`
 
+	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
+    Orders    []Order   `gorm:"foreignKey:UserID" json:"orders,omitempty"`
+	
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`

@@ -1,68 +1,76 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-	"golang/config"
-	"golang/internal/cache"
-	"golang/internal/routes"
-	"golang/migration"
-	"golang/src/controllers"
-	"golang/src/database"
-	"golang/src/repository"
-	"golang/src/services"
-	"golang/utils/email"
-	"golang/utils/jwt"
-	"golang/utils/logger"
-	"golang/utils/validation"
-	"log"
+    "github.com/gin-gonic/gin"
+    "golang/config"
+    "golang/internal/cache"
+    "golang/internal/routes"
+    "golang/migration"
+    "golang/src/controllers"
+    "golang/src/database"
+    "golang/src/repository"
+    "golang/src/services"
+    "golang/utils/email"
+    "golang/utils/jwt"
+    "golang/utils/logger"
+    "golang/utils/validation"
+    "log"
 )
 
 func main() {
 
-	cfg := config.LoadConfig()
+    cfg := config.LoadConfig()
 
-	logger.InitLogger()
+    logger.InitLogger()
 
-	validation.InitValidation()
+    validation.InitValidation()
 
-	db := database.SetupDatabase(cfg)
+    db := database.SetupDatabase(cfg)
 
-	migration.Migrate(db)
+    migration.Migrate(db)
 
-	repo := repository.SetUpRepo(db)
+    repo := repository.SetUpRepo(db)
 
-	redis := cache.NewRedis()
+    redis := cache.NewRedis()
 
-	jwtManager := jwt.NewJWTManager(cfg)
+    jwtManager := jwt.NewJWTManager(cfg)
 
-	emailService := email.NewEmailService(cfg)
+    emailService := email.NewEmailService(cfg)
 
-	authService := services.NewAuthService(repo, jwtManager, emailService, redis, cfg)
-	productService := services.NewProductService(repo)
-	wishlistService := services.NewWishlistService(repo)
-	cartService := services.NewCartService(repo)
+    authService := services.NewAuthService(repo, jwtManager, emailService, redis, cfg)
+    productService := services.NewProductService(repo)
+    wishlistService := services.NewWishlistService(repo)
+    cartService := services.NewCartService(repo)
+    paymentService := services.NewPaymentService(repo, cfg)
+    orderService := services.NewOrderService(repo)
 
-	authController := controllers.NewAuthController(authService)
-	productController := controllers.NewProductController(productService)
-	wishlistController := controllers.NewWishlistController(wishlistService)
-	cartController := controllers.NewCartController(cartService)
-	adminController := controllers.NewAdminController(productService, repo)
+    authController := controllers.NewAuthController(authService)
+    productController := controllers.NewProductController(productService)
+    wishlistController := controllers.NewWishlistController(wishlistService)
+    cartController := controllers.NewCartController(cartService)
+    paymentController := controllers.NewPaymentController(paymentService)
+    orderController := controllers.NewOrderController(orderService)
+    addressController := controllers.NewAddressController(repo)  // Pass repo directly
+    adminController := controllers.NewAdminController(productService, repo)
 
-	r := gin.Default()
+    r := gin.Default()
 
-	routes.SetUpRoutes(
-		r,
-		authController,
-		jwtManager,
-		productController,
-		wishlistController,
-		cartController,
-		adminController,
-		repo,
-	)
+    routes.SetUpRoutes(
+        r,
+        authController,
+        jwtManager,
+        productController,
+        wishlistController,
+        cartController,
+        paymentController,
+        addressController,  // Now this matches the expected type
+        orderController,
+        adminController,
+        repo,
+    )
 
-	logger.Log.Info("Server running on port", cfg.Server.Port)
-	if err := r.Run(":" + cfg.Server.Port); err != nil {
-		log.Fatal("Server failed to start:", err)
-	}
+    logger.Log.Info("Server running on port", cfg.Server.Port)
+    if err := r.Run(":" + cfg.Server.Port); err != nil {
+        log.Fatal("Server failed to start:", err)
+    }
 }
