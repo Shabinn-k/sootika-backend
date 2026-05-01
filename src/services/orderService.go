@@ -158,14 +158,14 @@ func (s *OrderService) GetOrderByID(orderID string) (*models.Order, error) {
 	return &order, nil
 }
 
-func (s *OrderService) UpdateOrderStatus(orderID string, status string) error {
-	updates := map[string]interface{}{
-		"order_status": status,
-		"track":        status,
-		"updated_at":   time.Now(),
+	func (s *OrderService) UpdateOrderStatus(orderID string, status string) error {
+		updates := map[string]interface{}{
+			"order_status": status,
+			"track":        status,
+			"updated_at":   time.Now(),
+		}
+		return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
 	}
-	return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
-}
 
 func (s *OrderService) UpdatePaymentStatus(orderID string, paymentStatus string, paymentID string) error {
 	updates := map[string]interface{}{

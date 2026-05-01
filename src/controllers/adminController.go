@@ -34,8 +34,7 @@ func (a *AdminController) Dashboard(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
 	var totalProducts int64
-	var totalUsers int64
-	var pendingFeedback int64
+	var totalUsers int64 
 	var recentUsers []models.User
 	var totalOrders int64
 	var pendingOrders int64
@@ -47,10 +46,7 @@ func (a *AdminController) Dashboard(c *gin.Context) {
 	if err := a.repo.Count(&models.User{}, &totalUsers); err != nil {
 		totalUsers = 0
 	}
-
-	if err := a.repo.GetDB().Model(&models.Feedback{}).Where("feed = ?", "pending").Count(&pendingFeedback).Error; err != nil {
-		pendingFeedback = 0
-	}
+ 
 
 	a.repo.GetDB().Model(&models.Order{}).Count(&totalOrders)
 	a.repo.GetDB().Model(&models.Order{}).Where("order_status = ?", "pending").Count(&pendingOrders)
@@ -75,7 +71,6 @@ func (a *AdminController) Dashboard(c *gin.Context) {
 		"stats": gin.H{
 			"total_products":   totalProducts,
 			"total_users":      totalUsers,
-			"pending_feedback": pendingFeedback,
 			"total_revenue":    totalRevenue,
 			"recent_users":     recentUsers,
 			"total_orders":     totalOrders,
@@ -254,66 +249,6 @@ func (a *AdminController) GetTotalUsers(c *gin.Context) {
 	var count int64
 	a.repo.Count(&models.User{}, &count)
 	c.JSON(constant.SUCCESS, gin.H{"total_users": count})
-}
-
-func (a *AdminController) GetAllFeedbacks(c *gin.Context) {
-	role, exists := c.Get("role")
-	if !exists || role.(string) != "admin" {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
-		return
-	}
-
-	var feedbacks []models.Feedback
-	if err := a.repo.FindAll(&feedbacks); err != nil {
-		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to fetch feedbacks"})
-		return
-	}
-	c.JSON(constant.SUCCESS, feedbacks)
-}
-
-func (a *AdminController) ApproveFeedback(c *gin.Context) {
-	role, exists := c.Get("role")
-	if !exists || role.(string) != "admin" {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
-		return
-	}
-	feedbackID := c.Param("id")
-	if feedbackID == "" {
-		c.JSON(constant.BADREQUEST, gin.H{"error": "Feedback ID is required"})
-		return
-	}
-	updates := map[string]interface{}{
-		"feed": "approved",
-	}
-	if err := a.repo.UpdateByFields(&models.Feedback{}, feedbackID, updates); err != nil {
-		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to approve feedback"})
-		return
-	}
-	c.JSON(constant.SUCCESS, gin.H{"message": "Feedback approved successfully"})
-}
-
-func (a *AdminController) DeleteFeedback(c *gin.Context) {
-	role, exists := c.Get("role")
-	if !exists || role.(string) != "admin" {
-		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "Admin access required"})
-		return
-	}
-
-	feedbackID := c.Param("id")
-	if feedbackID == "" {
-		c.JSON(constant.BADREQUEST, gin.H{"error": "Feedback ID is required"})
-		return
-	}
-	var feedback models.Feedback
-	if err := a.repo.FindByID(&feedback, feedbackID); err != nil {
-		c.JSON(constant.NOTFOUND, gin.H{"error": "Feedback not found"})
-		return
-	}
-	if err := a.repo.Delete(&feedback, feedbackID); err != nil {
-		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "Failed to delete feedback"})
-		return
-	}
-	c.JSON(constant.SUCCESS, gin.H{"message": "Feedback deleted successfully"})
 }
 
 func (a *AdminController) GetAllOrders(c *gin.Context) {

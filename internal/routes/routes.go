@@ -1,13 +1,12 @@
 package routes
 
 import (
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+
 	"golang/middleware"
 	"golang/src/controllers"
 	"golang/src/repository"
 	"golang/utils/jwt"
-	"time"
 )
 
 func SetUpRoutes(
@@ -23,15 +22,6 @@ func SetUpRoutes(
 	adminController *controllers.AdminController,
 	repo *repository.Repository,
 ) {
-
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
@@ -56,7 +46,7 @@ func SetUpRoutes(
 
 	products := api.Group("/products")
 	{
-		products.GET("/", productController.GetAllProducts)
+		products.GET("", productController.GetAllProducts)
 		products.GET("/:id", productController.GetProductByID)
 		products.GET("/search", productController.SearchProducts)
 		products.GET("/in-stock", productController.GetInStockProducts)
@@ -65,24 +55,24 @@ func SetUpRoutes(
 	wishlist := api.Group("/wishlist")
 	wishlist.Use(middleware.AuthMiddleware(jwtManager))
 	{
-		wishlist.GET("/", wishlistController.GetWishlist)
+		wishlist.GET("", wishlistController.GetWishlist)
 		wishlist.GET("/count", wishlistController.GetWishlistCount)
-		wishlist.POST("/", wishlistController.AddToWishlist)
+		wishlist.POST("", wishlistController.AddToWishlist)
 		wishlist.GET("/:product_id", wishlistController.IsInWishlist)
 		wishlist.DELETE("/:product_id", wishlistController.RemoveFromWishlist)
-		wishlist.DELETE("/", wishlistController.ClearWishlist)
+		wishlist.DELETE("", wishlistController.ClearWishlist)
 	}
 
 	cart := api.Group("/cart")
 	cart.Use(middleware.AuthMiddleware(jwtManager))
 	{
-		cart.GET("/", cartController.GetCart)
+		cart.GET("", cartController.GetCart)
 		cart.GET("/count", cartController.GetCartCount)
 		cart.GET("/total", cartController.GetCartTotal)
-		cart.POST("/", cartController.AddToCart)
+		cart.POST("", cartController.AddToCart)
 		cart.PUT("/:item_id", cartController.UpdateCartItemQuantity)
 		cart.DELETE("/:item_id", cartController.RemoveFromCart)
-		cart.DELETE("/", cartController.ClearCart)
+		cart.DELETE("", cartController.ClearCart)
 	}
 
 	payment := api.Group("/payment")
@@ -95,8 +85,8 @@ func SetUpRoutes(
 	addresses := api.Group("/addresses")
 	addresses.Use(middleware.AuthMiddleware(jwtManager))
 	{
-		addresses.GET("/", addressController.GetMyAddresses)
-		addresses.POST("/", addressController.AddAddress)
+		addresses.GET("", addressController.GetMyAddresses)
+		addresses.POST("", addressController.AddAddress)
 		addresses.PUT("/:id", addressController.UpdateAddress)
 		addresses.DELETE("/:id", addressController.DeleteAddress)
 	}
@@ -104,8 +94,8 @@ func SetUpRoutes(
 	orders := api.Group("/orders")
 	orders.Use(middleware.AuthMiddleware(jwtManager))
 	{
-		orders.POST("/", orderController.CreateOrder)
-		orders.GET("/", orderController.GetMyOrders)
+		orders.POST("", orderController.CreateOrder)
+		orders.GET("", orderController.GetMyOrders)
 		orders.GET("/:id", orderController.GetOrderByID)
 		orders.PUT("/:id/cancel", orderController.CancelOrder)
 	}
@@ -115,6 +105,7 @@ func SetUpRoutes(
 	admin.Use(middleware.AdminMiddleware(repo))
 	{
 		admin.GET("/dashboard", adminController.Dashboard)
+
 		admin.GET("/users", adminController.GetAllUsers)
 		admin.GET("/users/:id", adminController.GetUserByID)
 		admin.PUT("/users/:id/role", adminController.UpdateUserRole)
@@ -124,10 +115,7 @@ func SetUpRoutes(
 		admin.GET("/products/count", adminController.GetTotalProducts)
 		admin.GET("/orders", adminController.GetAllOrders)
 		admin.PUT("/orders/:id/status", adminController.UpdateOrderStatus)
-
-		admin.GET("/feedbacks", adminController.GetAllFeedbacks)
-		admin.PUT("/feedbacks/:id", adminController.ApproveFeedback)
-		admin.DELETE("/feedbacks/:id", adminController.DeleteFeedback)
+ 
 
 		admin.POST("/products", productController.CreateProduct)
 		admin.PUT("/products/:id", productController.UpdateProduct)

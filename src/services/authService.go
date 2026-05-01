@@ -1,8 +1,7 @@
 package services
 
 import (
-	"errors"
-	"fmt"
+	"errors" 
 	"github.com/google/uuid"
 	"golang/config"
 	"golang/internal/cache"
@@ -15,6 +14,7 @@ import (
 	"golang/utils/password"
 	"time"
 	"strings"
+	"fmt"
 )
 
 type AuthService struct {
@@ -42,81 +42,102 @@ func NewAuthService(
 }
 
 func (s *AuthService) Signup(name, emailStr, phone, passwordStr string) error {
-
-	var existing models.User
-	err := s.repo.FindOneWhere(&existing, "email = ?", emailStr)
-	if err == nil {
-		if existing.IsVerified {
-			return errors.New("email already exist")
-		} else {
-			s.repo.Delete(&models.User{}, existing.ID)
-		}
-	}
-	otpcode, err := otp.GenerateOTP(s.cfg.OTP.Length)
-	if err != nil {
-		return err
-	}
-	hashedOTP, err := password.HashPassword(otpcode)
-	if err != nil {
-		return err
-	}
-	if err := s.emailService.SendOTP(emailStr, otpcode); err != nil {
-		return err
-	}
-	hashed, err := password.HashPassword(passwordStr)
-	if err != nil {
-		return err
-	}
-	user := models.User{
-		Name:       name,
-		Email:      emailStr,
-		Phone:      phone,
-		Password:   hashed,
-		IsVerified: false,
-	}
-	if err := s.repo.Insert(&user); err != nil {
-		return err
-	}
-
-	key := "otp:verify:" + emailStr
-	s.redis.Client.Set(
-		cache.Ctx,
-		key,
-		hashedOTP,
-		time.Duration(s.cfg.OTP.ExpiryMinutes)*time.Minute,
-	)
-	logger.Log.Infof("OTP sent to %s", emailStr)
-	return nil
+    emailStr = strings.ToLower(strings.TrimSpace(emailStr))
+    
+    var existing models.User
+    err := s.repo.FindOneWhere(&existing, "email = ?", emailStr)
+    if err == nil {
+        if existing.IsVerified {
+            return errors.New("email already exist")
+        } else {
+            s.repo.Delete(&models.User{}, existing.ID)
+        }
+    }
+    
+    otpcode, err := otp.GenerateOTP(s.cfg.OTP.Length)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Println("Generated OTP for", emailStr, ":", otpcode) 
+    
+    if err := s.emailService.SendOTP(emailStr, otpcode); err != nil {
+        return err
+    }
+    hashed, err := password.HashPassword(passwordStr)
+    if err != nil {
+        return err
+    }
+    
+    user := models.User{
+        Name:       name,
+        Email:      emailStr,
+        Phone:      phone,
+        Password:   hashed,
+        IsVerified: false,
+    }
+    if err := s.repo.Insert(&user); err != nil {
+        return err
+    }
+     
+    key := "otp:verify:" + emailStr
+    expiry := time.Duration(s.cfg.OTP.ExpiryMinutes) * time.Minute
+    
+    err = s.redis.Client.Set(cache.Ctx, key, otpcode, expiry).Err()
+    if err != nil {
+        fmt.Println("Redis SET error:", err)
+        return errors.New("failed to save OTP")
+    }
+     
+    saved, _ := s.redis.Client.Get(cache.Ctx, key).Result()
+    fmt.Println("Verified OTP saved in Redis:", saved)
+    
+    return nil
 }
 
 func (s *AuthService) VerifyOTP(emailStr, otpCode string) error {
-	var user models.User
-	err := s.repo.FindOneWhere(&user, "email = ?", emailStr)
-	if err != nil {
-		return errors.New("user not found")
-	}
-	if user.IsVerified {
-		return errors.New("already verified")
-	}
-	key := "otp:verify:" + strings.ToLower(emailStr)
-	storedOTP, err := s.redis.Client.Get(cache.Ctx, key).Result()
-	if err != nil {
-		return errors.New("OTP expired")
-	}
-	if !password.ComparePassword(storedOTP, otpCode) {
-		return errors.New("invalid OTP")
-	}
-	updates := map[string]interface{}{
-		"is_verified": true,
-	}
-	if err := s.repo.UpdateByFields(&models.User{}, user.ID, updates); err != nil {
-		return err
-	}
-	s.redis.Client.Del(cache.Ctx, key)
-	fmt.Println("Stored OTP:", storedOTP)
-	fmt.Println("Input OTP:", otpCode)
-	return nil
+    emailStr = strings.ToLower(strings.TrimSpace(emailStr))
+    otpCode = strings.TrimSpace(otpCode)
+    
+    var user models.User
+    err := s.repo.FindOneWhere(&user, "email = ?", emailStr)
+    if err != nil {
+        return errors.New("user not found")
+    }
+    
+    if user.IsVerified {
+        return errors.New("already verified")
+    }
+    
+    key := "otp:verify:" + emailStr
+    storedOTP, err := s.redis.Client.Get(cache.Ctx, key).Result()
+    
+    fmt.Println("=== OTP DEBUG ===")
+    fmt.Println("Key:", key)
+    fmt.Println("Stored OTP:", storedOTP)
+    fmt.Println("Input OTP:", otpCode)
+    fmt.Println("Error:", err)
+    fmt.Println("=================")
+    
+    if err != nil {
+        return errors.New("OTP expired or not found. Please request a new code")
+    }
+    
+    if storedOTP != otpCode {
+        return errors.New("invalid OTP code")
+    }
+    
+    updates := map[string]interface{}{
+        "is_verified": true,
+    }
+    if err := s.repo.UpdateByFields(&models.User{}, user.ID, updates); err != nil {
+        return err
+    }
+    s.redis.Client.Del(cache.Ctx, key)
+    
+    return nil
 }
+
 
 func (s *AuthService) ResendOTP(emailStr string) error {
 	var user models.User
@@ -132,21 +153,19 @@ func (s *AuthService) ResendOTP(emailStr string) error {
 	if err != nil {
 		return err
 	}
-	hashedOTP, err := password.HashPassword(otpcode)
-	if err != nil {
-		return err
-	}
+	
 	if err := s.emailService.SendOTP(emailStr, otpcode); err != nil {
 		return err
 	}
 
-	key := "otp:verify:" + emailStr
+	key := "otp:verify:" + strings.ToLower(emailStr)
 	s.redis.Client.Set(
 		cache.Ctx,
 		key,
-		hashedOTP,
+		otpcode,  
 		time.Duration(s.cfg.OTP.ExpiryMinutes)*time.Minute,
 	)
+	
 	logger.Log.Infof("OTP resent to %s", emailStr)
 	return nil
 }
