@@ -2,6 +2,8 @@ package services
 
 import (
 	"errors"
+	"fmt"
+	"github.com/google/uuid"
 	"golang/config"
 	"golang/internal/cache"
 	"golang/src/models"
@@ -12,8 +14,7 @@ import (
 	"golang/utils/otp"
 	"golang/utils/password"
 	"time"
-
-	"github.com/google/uuid"
+	"strings"
 )
 
 type AuthService struct {
@@ -97,7 +98,7 @@ func (s *AuthService) VerifyOTP(emailStr, otpCode string) error {
 	if user.IsVerified {
 		return errors.New("already verified")
 	}
-	key := "otp:verify:" + emailStr
+	key := "otp:verify:" + strings.ToLower(emailStr)
 	storedOTP, err := s.redis.Client.Get(cache.Ctx, key).Result()
 	if err != nil {
 		return errors.New("OTP expired")
@@ -112,6 +113,8 @@ func (s *AuthService) VerifyOTP(emailStr, otpCode string) error {
 		return err
 	}
 	s.redis.Client.Del(cache.Ctx, key)
+	fmt.Println("Stored OTP:", storedOTP)
+	fmt.Println("Input OTP:", otpCode)
 	return nil
 }
 
