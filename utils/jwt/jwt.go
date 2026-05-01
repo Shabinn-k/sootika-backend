@@ -48,8 +48,13 @@ func (j *Manager) GenerateRefreshToken(userId, role, sessionId string) (string, 
 
 func (j *Manager) ValidateAccessToken(tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return []byte(j.accessSecret), nil
 	})
+
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid access token")
 	}
@@ -57,13 +62,19 @@ func (j *Manager) ValidateAccessToken(tokenStr string) (jwt.MapClaims, error) {
 	if !ok {
 		return nil, errors.New("invalid token claims")
 	}
+
 	return claims, nil
 }
 
-func (j *Manager) ValidateRefresh(tokenStr string) (jwt.MapClaims, error) {
+func (j *Manager) ValidateRefreshToken(tokenStr string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (any, error) {
+
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return []byte(j.refreshSecret), nil
 	})
+
 	if err != nil || !token.Valid {
 		return nil, errors.New("invalid refresh token")
 	}

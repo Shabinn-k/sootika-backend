@@ -69,7 +69,7 @@ func FormatValidationErrors(err error) gin.H {
 				errors = append(errors, fmt.Sprintf("%s must be a valid 10-digit phone number", e.Field()))
 
 			case "password":
-				errors = append(errors, fmt.Sprintf("%s must contain uppercase, lowercase and a number", e.Field()))
+				errors = append(errors, fmt.Sprintf("%s must contain uppercase, lowercase", e.Field()))
 
 			case "min":
 				errors = append(errors, fmt.Sprintf("%s is too short", e.Field()))

@@ -1,181 +1,177 @@
 package services
 
 import (
-    "fmt"
-    "time"
-    
-    "github.com/google/uuid"
-    "golang/src/models"
-    "golang/src/repository"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"golang/src/models"
+	"golang/src/repository"
 )
 
 type OrderService struct {
-    repo repository.PgSQLRepository
+	repo repository.PgSQLRepository
 }
 
 func NewOrderService(repo repository.PgSQLRepository) *OrderService {
-    return &OrderService{repo: repo}
+	return &OrderService{repo: repo}
 }
 
 type OrderItemInput struct {
-    ProductID uuid.UUID
-    Quantity  int
+	ProductID uuid.UUID
+	Quantity  int
 }
 
 func (s *OrderService) CreateOrder(userID uuid.UUID, items []OrderItemInput, addressID uuid.UUID, paymentMethod string) (*models.Order, error) {
-    var user models.User
-    if err := s.repo.FindByID(&user, userID); err != nil {
-        return nil, fmt.Errorf("user not found")
-    }
-    
-    var address models.Address
-    if err := s.repo.FindByID(&address, addressID); err != nil {
-        return nil, fmt.Errorf("address not found")
-    }
-    
-    if address.UserID != userID {
-        return nil, fmt.Errorf("address does not belong to user")
-    }
-    
-    var subtotal int64
-    var orderItems []models.OrderItem
-    
-    // First validate all products have sufficient stock
-    for _, item := range items {
-        var product models.Product
-        if err := s.repo.FindByID(&product, item.ProductID); err != nil {
-            return nil, fmt.Errorf("product not found: %v", item.ProductID)
-        }
-        
-        if product.Stock < item.Quantity {
-            return nil, fmt.Errorf("insufficient stock for product: %s (available: %d, requested: %d)", 
-                product.Name, product.Stock, item.Quantity)
-        }
-        
-        total := product.Price * int64(item.Quantity)
-        subtotal += total
-        
-        orderItems = append(orderItems, models.OrderItem{
-            ProductID: item.ProductID,
-            Title:     product.Title,
-            Name:      product.Name,
-            Image:     product.MainImage,
-            Price:     product.Price,
-            Quantity:  item.Quantity,
-            Total:     total,
-        })
-    }
-    
-    shippingCost := int64(80)
-    tax := int64(0)
-    discount := int64(0)
-    total := subtotal + shippingCost + tax - discount
-    
-    orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8])
-    order := &models.Order{
-        OrderNumber:     orderNumber,
-        UserID:          userID,
-        Total:           total,
-        Subtotal:        subtotal,
-        ShippingCost:    shippingCost,
-        Tax:             tax,
-        Discount:        discount,
-        PaymentMethod:   paymentMethod,
-        PaymentStatus:   "pending",
-        OrderStatus:     "pending",
-        Track:           "Pending",
-        ShippingAddress: address,
-    }
-    
-    tx := s.repo.BeginTransaction()
-    defer func() {
-        if r := recover(); r != nil {
-            tx.Rollback()
-        }
-    }()
-    
-    if err := tx.Insert(order); err != nil {
-        tx.Rollback()
-        return nil, fmt.Errorf("failed to create order: %w", err)
-    }
-    
-    for i := range orderItems {
-        orderItems[i].OrderID = order.ID
-        if err := tx.Insert(&orderItems[i]); err != nil {
-            tx.Rollback()
-            return nil, fmt.Errorf("failed to create order items: %w", err)
-        }
-        
-        // Reduce product stock
-        var product models.Product
-        if err := tx.FindByID(&product, orderItems[i].ProductID); err == nil {
-            stockUpdates := map[string]interface{}{
-                "stock":    product.Stock - orderItems[i].Quantity,
-                "in_stock": (product.Stock - orderItems[i].Quantity) > 0,
-            }
-            if err := tx.UpdateByFields(&models.Product{}, product.ID, stockUpdates); err != nil {
-                tx.Rollback()
-                return nil, fmt.Errorf("failed to update product stock: %w", err)
-            }
-        }
-    }
-    
-    // Clear user's cart after successful order
-    var cart models.Cart
-    if err := tx.FindOneWhere(&cart, "user_id = ?", userID); err == nil {
-        tx.DeleteWhere(&models.CartItem{}, "cart_id = ?", cart.ID)
-    }
-    
-    if err := tx.Commit(); err != nil {
-        return nil, fmt.Errorf("failed to commit order: %w", err)
-    }
-    
-    order.Items = orderItems
-    return order, nil
+	var user models.User
+	if err := s.repo.FindByID(&user, userID); err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	var address models.Address
+	if err := s.repo.FindByID(&address, addressID); err != nil {
+		return nil, fmt.Errorf("address not found")
+	}
+
+	if address.UserID != userID {
+		return nil, fmt.Errorf("address does not belong to user")
+	}
+
+	var subtotal int64
+	var orderItems []models.OrderItem
+
+	for _, item := range items {
+		var product models.Product
+		if err := s.repo.FindByID(&product, item.ProductID); err != nil {
+			return nil, fmt.Errorf("product not found: %v", item.ProductID)
+		}
+
+		if product.Stock < item.Quantity {
+			return nil, fmt.Errorf("insufficient stock for product: %s (available: %d, requested: %d)",
+				product.Name, product.Stock, item.Quantity)
+		}
+
+		total := product.Price * int64(item.Quantity)
+		subtotal += total
+
+		orderItems = append(orderItems, models.OrderItem{
+			ProductID: item.ProductID,
+			Title:     product.Title,
+			Name:      product.Name,
+			Image:     product.MainImage,
+			Price:     product.Price,
+			Quantity:  item.Quantity,
+			Total:     total,
+		})
+	}
+
+	shippingCost := int64(80)
+	tax := int64(0)
+	discount := int64(0)
+	total := subtotal + shippingCost + tax - discount
+
+	orderNumber := fmt.Sprintf("ORD%d%s", time.Now().UnixNano(), userID.String()[:8])
+	order := &models.Order{
+		OrderNumber:     orderNumber,
+		UserID:          userID,
+		Total:           total,
+		Subtotal:        subtotal,
+		ShippingCost:    shippingCost,
+		Tax:             tax,
+		Discount:        discount,
+		PaymentMethod:   paymentMethod,
+		PaymentStatus:   "pending",
+		OrderStatus:     "pending",
+		ShippingAddress: address,
+	}
+
+	tx := s.repo.BeginTransaction()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Insert(order); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to create order: %w", err)
+	}
+
+	for i := range orderItems {
+		orderItems[i].OrderID = order.ID
+		if err := tx.Insert(&orderItems[i]); err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to create order items: %w", err)
+		}
+
+		var product models.Product
+		if err := tx.FindByID(&product, orderItems[i].ProductID); err == nil {
+			stockUpdates := map[string]interface{}{
+				"stock":    product.Stock - orderItems[i].Quantity,
+				"in_stock": (product.Stock - orderItems[i].Quantity) > 0,
+			}
+			if err := tx.UpdateByFields(&models.Product{}, product.ID, stockUpdates); err != nil {
+				tx.Rollback()
+				return nil, fmt.Errorf("failed to update product stock: %w", err)
+			}
+		}
+	}
+
+	var cart models.Cart
+	if err := tx.FindOneWhere(&cart, "user_id = ?", userID); err == nil {
+		tx.DeleteWhere(&models.CartItem{}, "cart_id = ?", cart.ID)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit order: %w", err)
+	}
+
+	order.Items = orderItems
+	return order, nil
 }
 
 func (s *OrderService) GetUserOrders(userID uuid.UUID) ([]models.Order, error) {
-    var orders []models.Order
-    if err := s.repo.FindAllWhere(&orders, "user_id = ?", userID); err != nil {
-        return nil, err
-    }
-    
-    for i := range orders {
-        var items []models.OrderItem
-        s.repo.FindAllWhere(&items, "order_id = ?", orders[i].ID)
-        orders[i].Items = items
-    }
-    
-    return orders, nil
+	var orders []models.Order
+	if err := s.repo.FindAllWhere(&orders, "user_id = ?", userID); err != nil {
+		return nil, err
+	}
+
+	for i := range orders {
+		var items []models.OrderItem
+		s.repo.FindAllWhere(&items, "order_id = ?", orders[i].ID)
+		orders[i].Items = items
+	}
+
+	return orders, nil
 }
 
 func (s *OrderService) GetOrderByID(orderID string) (*models.Order, error) {
-    var order models.Order
-    if err := s.repo.FindByID(&order, orderID); err != nil {
-        return nil, err
-    }
-    
-    var items []models.OrderItem
-    s.repo.FindAllWhere(&items, "order_id = ?", order.ID)
-    order.Items = items
-    
-    return &order, nil
+	var order models.Order
+	if err := s.repo.FindByID(&order, orderID); err != nil {
+		return nil, err
+	}
+
+	var items []models.OrderItem
+	s.repo.FindAllWhere(&items, "order_id = ?", order.ID)
+	order.Items = items
+
+	return &order, nil
 }
 
 func (s *OrderService) UpdateOrderStatus(orderID string, status string) error {
-    updates := map[string]interface{}{
-        "order_status": status,
-        "track":        status,
-        "updated_at":   time.Now(),
-    }
-    return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
+	updates := map[string]interface{}{
+		"order_status": status,
+		"track":        status,
+		"updated_at":   time.Now(),
+	}
+	return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
 }
 
 func (s *OrderService) UpdatePaymentStatus(orderID string, paymentStatus string, paymentID string) error {
-    updates := map[string]interface{}{
-        "payment_status":      paymentStatus,
-        "razorpay_payment_id": paymentID,
-        "updated_at":          time.Now(),
-    }
-    return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
+	updates := map[string]interface{}{
+		"payment_status":      paymentStatus,
+		"razorpay_payment_id": paymentID,
+		"updated_at":          time.Now(),
+	}
+	return s.repo.UpdateByFields(&models.Order{}, orderID, updates)
 }

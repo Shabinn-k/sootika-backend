@@ -39,7 +39,7 @@ func (a *AuthController) Signup(c *gin.Context) {
 		c.JSON(constant.BADREQUEST, validation.FormatValidationErrors(err))
 		return
 	}
-	logger.Log.Info("Signup:", req.Email)
+	logger.Log.Info("Signup request received")
 	err := a.authService.Signup(req.Name, req.Email, req.Phone, req.Password)
 	if err != nil {
 		logger.Log.Error("Signup failed:", err)
@@ -142,8 +142,16 @@ func (a *AuthController) Logout(c *gin.Context) {
 }
 
 func (a *AuthController) Dashboard(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-	role, _ := c.Get("role")
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
+		return
+	}
+	role, exists := c.Get("role")
+	if !exists {
+		c.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
+	}
+
 	user, err := a.authService.GetUserByID(userID.(string))
 	if err != nil {
 		c.JSON(constant.INTERNALSERVERERROR, gin.H{"error": "failed to get user info"})

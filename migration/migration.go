@@ -16,10 +16,10 @@ func Migrate(db *gorm.DB) {
         &models.CartItem{},
         &models.Wishlist{},
         &models.WishlistItem{},
-        &models.Address{},      // Add this
-        &models.Order{},        // Add this
-        &models.OrderItem{},    // Add this
-        &models.Payment{},      // Add this
+        &models.Address{},      
+        &models.Order{},        
+        &models.OrderItem{},    
+        &models.Payment{},      
     )
     if err != nil {
         log.Fatal("Migration failed:", err)

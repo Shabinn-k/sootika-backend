@@ -11,7 +11,7 @@ type User struct {
 	ID uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 
 	Name     string `json:"name" binding:"required,min=2,max=50,name"`
-	Email    string `json:"email" binding:"required,email"`
+	Email    string `json:"email" binding:"required,email" gorm:"uniqueIndex;not null"`
 	Password string `binding:"required,min=6,password" gorm:"not null" json:"-"`
 	Phone    string `gorm:"type:varchar(15);uniqueIndex;not null"`
 
@@ -20,8 +20,8 @@ type User struct {
 	IsVerified bool   `gorm:"default:false" json:"is_verified"`
 
 	Addresses []Address `gorm:"foreignKey:UserID" json:"addresses,omitempty"`
-    Orders    []Order   `gorm:"foreignKey:UserID" json:"orders,omitempty"`
-	
+	Orders    []Order   `gorm:"foreignKey:UserID" json:"orders,omitempty"`
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`

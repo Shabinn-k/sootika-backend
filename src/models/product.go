@@ -9,8 +9,8 @@ import (
 
 type Product struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Title       string    `gorm:"not null" json:"title"`
-	Name        string    `gorm:"not null" json:"name"`
+	Title       string    `gorm:"not null;index" json:"title"`
+	Name        string    `gorm:"not null;index" json:"name"`
 	Description string    `gorm:"type:text;not null" json:"description"`
 	Price       int64     `gorm:"not null" json:"price"`
 

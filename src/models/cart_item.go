@@ -10,7 +10,6 @@ import (
 type CartItem struct {
 	ID uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 
-	// ⚠️ CRITICAL FIX: Correct unique composite index
 	CartID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_cart_product" json:"cart_id"`
 	ProductID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_cart_product" json:"product_id"`
 

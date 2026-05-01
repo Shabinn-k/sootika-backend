@@ -16,38 +16,45 @@ func NewAddressController(service *services.AddressService) *AddressController {
 	return &AddressController{Service: service}
 }
 
-func (c *AddressController) GetMyAddresses(ctx *gin.Context) {
+func parseUserUUID(ctx *gin.Context) (uuid.UUID, bool) {
 	userID, exists := ctx.Get("user_id")
 	if !exists {
 		ctx.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
-		return
+		return uuid.Nil, false
 	}
 
-	userUUID, err := uuid.Parse(userID.(string))
-	if err != nil {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+	switch v := userID.(type) {
+	case string:
+		id, err := uuid.Parse(v)
+		if err != nil {
+			ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+			return uuid.Nil, false
+		}
+		return id, true
+	case uuid.UUID:
+		return v, true
+	default:
+		ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID type"})
+		return uuid.Nil, false
+	}
+}
+
+func (c *AddressController) GetMyAddresses(ctx *gin.Context) {
+	userUUID, ok := parseUserUUID(ctx)
+	if !ok {
 		return
 	}
-
 	addresses, err := c.Service.GetUserAddresses(userUUID)
 	if err != nil {
 		ctx.JSON(constant.INTERNALSERVERERROR, gin.H{"error": err.Error()})
 		return
 	}
-
 	ctx.JSON(constant.SUCCESS, gin.H{"addresses": addresses})
 }
 
 func (c *AddressController) AddAddress(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID.(string))
-	if err != nil {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+	userUUID, ok := parseUserUUID(ctx)
+	if !ok {
 		return
 	}
 
@@ -69,15 +76,8 @@ func (c *AddressController) AddAddress(ctx *gin.Context) {
 }
 
 func (c *AddressController) UpdateAddress(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID.(string))
-	if err != nil {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+	userUUID, ok := parseUserUUID(ctx)
+	if !ok {
 		return
 	}
 
@@ -87,8 +87,6 @@ func (c *AddressController) UpdateAddress(ctx *gin.Context) {
 		ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid address ID"})
 		return
 	}
-
-	// Verify address belongs to user
 	address, err := c.Service.GetAddressByID(addressUUID)
 	if err != nil {
 		ctx.JSON(constant.NOTFOUND, gin.H{"error": "Address not found"})
@@ -115,15 +113,8 @@ func (c *AddressController) UpdateAddress(ctx *gin.Context) {
 }
 
 func (c *AddressController) DeleteAddress(ctx *gin.Context) {
-	userID, exists := ctx.Get("user_id")
-	if !exists {
-		ctx.JSON(constant.UNAUTHORIZED, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID.(string))
-	if err != nil {
-		ctx.JSON(constant.BADREQUEST, gin.H{"error": "Invalid user ID"})
+	userUUID, ok := parseUserUUID(ctx)
+	if !ok {
 		return
 	}
 
@@ -134,7 +125,6 @@ func (c *AddressController) DeleteAddress(ctx *gin.Context) {
 		return
 	}
 
-	// Verify address belongs to user
 	address, err := c.Service.GetAddressByID(addressUUID)
 	if err != nil {
 		ctx.JSON(constant.NOTFOUND, gin.H{"error": "Address not found"})

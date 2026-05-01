@@ -40,7 +40,7 @@ type UpdateProductInput struct {
 
 func (s *ProductService) CreateProduct(input *CreateProductInput) (*models.Product, error) {
 	if input == nil {
-		return nil, errors.New("Product data in nil")
+		return nil, errors.New("Product data is nil")
 	}
 	if input.Title == "" {
 		return nil, errors.New("Product title required")
@@ -68,7 +68,10 @@ func (s *ProductService) CreateProduct(input *CreateProductInput) (*models.Produ
 		secondFile, err := input.SecondImage.Open()
 		if err == nil {
 			defer secondFile.Close()
-			secondResult, _ = uploads.UploadImageFile(secondFile, input.SecondImage.Filename)
+			secondResult, err = uploads.UploadImageFile(secondFile, input.SecondImage.Filename)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	var thirdResult *uploads.CloudinaryResult
@@ -219,37 +222,32 @@ func (s *ProductService) DeleteProduct(productID string) error {
 	if err != nil {
 		return fmt.Errorf("invalid product id: %w", err)
 	}
-	
+
 	var product models.Product
 	if err := s.Repo.FindByID(&product, productUUID); err != nil {
 		return fmt.Errorf("product not found: %w", err)
 	}
-	
-	// Use transaction to ensure both image deletion and product deletion succeed or fail together
+
 	tx := s.Repo.BeginTransaction()
 	defer func() {
 		if r := recover(); r != nil {
 			tx.Rollback()
 		}
 	}()
-	
-	// Delete images (store public IDs before deletion)
+
 	mainPublicID := product.MainImagePublicID
 	secondPublicID := product.SecondImagePublicID
 	thirdPublicID := product.ThirdImagePublicID
-	
-	// Delete product from database first
+
 	if err := tx.Delete(&product, productUUID); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("failed to delete product: %w", err)
 	}
-	
-	// Commit transaction before deleting images (images can be deleted async)
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit product deletion: %w", err)
 	}
-	
-	// Delete images after successful DB deletion (best effort)
+
 	if mainPublicID != "" {
 		uploads.DeleteImage(mainPublicID)
 	}
@@ -259,7 +257,7 @@ func (s *ProductService) DeleteProduct(productID string) error {
 	if thirdPublicID != "" {
 		uploads.DeleteImage(thirdPublicID)
 	}
-	
+
 	return nil
 }
 

@@ -21,7 +21,7 @@ func (s *Service) SendMail(to, subject, body string) error {
 	msg := fmt.Sprintf(
 		"From: %s\r\n"+
 			"To: %s\r\n"+
-			"subject: %s\r\n"+
+			"Subject: %s\r\n"+
 			"MIME-Version:1.0\r\n"+
 			"Content-Type: text/plain;charset=\"UTF-8\"\r\n\r\n"+
 			"%s",

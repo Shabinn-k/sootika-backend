@@ -39,16 +39,18 @@ type Config struct {
 		ExpiryMinutes int
 	}
 
-	 Razorpay struct {
-        KeyID     string
-        KeySecret string
-    }
+	Razorpay struct {
+		KeyID     string
+		KeySecret string
+	}
 }
 
 func LoadConfig() *Config {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("No .env file found")
+	if os.Getenv("APP_ENV") != "production" {
+		err := godotenv.Load(".env")
+		if err != nil {
+			log.Println("No .env file found")
+		}
 	}
 	log.Println("ENV DB_HOST:", os.Getenv("DB_HOST"))
 
@@ -56,18 +58,18 @@ func LoadConfig() *Config {
 
 	cfg.Server.Port = getEnv("SERVER_PORT", "8080")
 
-	//database
-	cfg.DB.Host = getEnv("DB_HOST", "127.0.0.1")
+	// DB
+	cfg.DB.Host = mustGetEnv("DB_HOST")
 	cfg.DB.Port = getEnvAsInt("DB_PORT", 5432)
-	cfg.DB.User = getEnv("DB_USER", "postgres")
-	cfg.DB.Password = getEnv("DB_PASSWORD", "")
-	cfg.DB.Name = getEnv("DB_NAME", "Sootika")
-	cfg.DB.SSLMode = getEnv("DB_SSLMODE", "disable")
-	cfg.DB.TimeZone = getEnv("DB_TIMEZONE", "Asia/Kolkata")
+	cfg.DB.User = mustGetEnv("DB_USER")
+	cfg.DB.Password = mustGetEnv("DB_PASSWORD")
+	cfg.DB.Name = mustGetEnv("DB_NAME")
+	cfg.DB.SSLMode = getEnv("DB_SSLMODE", "require")
+	cfg.DB.TimeZone = getEnv("DB_TIMEZONE", "UTC")
 
 	//jwt
-	cfg.JWT.AccessSecret = getEnv("ACCESS_SECRET", "")
-	cfg.JWT.RefreshSecret = getEnv("REFRESH_SECRET", "")
+	cfg.JWT.AccessSecret = mustGetEnv("ACCESS_SECRET")
+	cfg.JWT.RefreshSecret = mustGetEnv("REFRESH_SECRET")
 	cfg.JWT.AccessTTLMinutes = getEnvAsInt("ACCESS_TTL_MINUTE", 15)
 	cfg.JWT.RefreshTTLHours = getEnvAsInt("REFRESH_TTL_HOUR", 168)
 	cfg.JWT.MaxSessionHours = getEnvAsInt("MAX_SESSION", 720)
@@ -83,9 +85,9 @@ func LoadConfig() *Config {
 	cfg.OTP.Length = getEnvAsInt("OTP_LENGTH", 5)
 	cfg.OTP.ExpiryMinutes = getEnvAsInt("OTP_EXPIRY_MINUTES", 5)
 
-		   // Razorpay
-    cfg.Razorpay.KeyID = getEnv("RAZORPAY_KEY_ID", "")
-    cfg.Razorpay.KeySecret = getEnv("RAZORPAY_KEY_SECRET", "")
+	// Razorpay
+	cfg.Razorpay.KeyID = mustGetEnv("RAZORPAY_KEY_ID")
+	cfg.Razorpay.KeySecret = mustGetEnv("RAZORPAY_KEY_SECRET")
 	return cfg
 }
 
@@ -103,4 +105,12 @@ func getEnvAsInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+func mustGetEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("Missing required env: %s", key)
+	}
+	return value
 }

@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	"golang/config"
 	"golang/internal/cache"
 	"golang/src/models"
@@ -13,6 +12,8 @@ import (
 	"golang/utils/otp"
 	"golang/utils/password"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type AuthService struct {
@@ -47,11 +48,10 @@ func (s *AuthService) Signup(name, emailStr, phone, passwordStr string) error {
 		if existing.IsVerified {
 			return errors.New("email already exist")
 		} else {
-			// Delete unverified user to allow fresh signup
 			s.repo.Delete(&models.User{}, existing.ID)
 		}
 	}
-	otpcode, err := otp.GenerateOTP()
+	otpcode, err := otp.GenerateOTP(s.cfg.OTP.Length)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (s *AuthService) ResendOTP(emailStr string) error {
 		return errors.New("already verified")
 	}
 
-	otpcode, err := otp.GenerateOTP()
+	otpcode, err := otp.GenerateOTP(s.cfg.OTP.Length)
 	if err != nil {
 		return err
 	}
@@ -214,14 +214,22 @@ func (s *AuthService) Login(emailStr, passwordStr string) (string, string, *mode
 }
 
 func (s *AuthService) Refresh(token string) (string, string, error) {
-	claims, err := s.jwtManager.ValidateRefresh(token)
+	claims, err := s.jwtManager.ValidateRefreshToken(token)
 	if err != nil {
 		return "", "", errors.New("invalid token")
 	}
-	sessionID := claims["session_id"].(string)
-	userID := claims["user_id"].(string)
-	role := claims["role"].(string)
-
+	sessionID, ok := claims["session_id"].(string)
+	if !ok {
+		return "", "", errors.New("invalid session_id")
+	}
+	userID, ok := claims["user_id"].(string)
+	if !ok {
+		return "", "", errors.New("invalid user_id")
+	}
+	role, ok := claims["role"].(string)
+	if !ok {
+		return "", "", errors.New("invalid role")
+	}
 	var stored models.RefreshToken
 	err = s.repo.FindOneWhere(&stored, "id = ?", sessionID)
 	if err != nil {
@@ -250,11 +258,14 @@ func (s *AuthService) Refresh(token string) (string, string, error) {
 }
 
 func (s *AuthService) Logout(token string) error {
-	claims, err := s.jwtManager.ValidateRefresh(token)
+	claims, err := s.jwtManager.ValidateRefreshToken(token)
 	if err != nil {
 		return errors.New("invalid token")
 	}
-	sessionID := claims["session_id"].(string)
+	sessionID, ok := claims["session_id"].(string)
+	if !ok {
+		return errors.New("invalid session_id")
+	}
 	return s.repo.Delete(&models.RefreshToken{}, sessionID)
 }
 

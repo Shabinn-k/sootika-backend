@@ -8,8 +8,8 @@ import (
 )
 
 type Feedback struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
 	Name      string    `json:"name"`
 	Rating    int       `json:"rating"`
 	Review    string    `json:"review"`
